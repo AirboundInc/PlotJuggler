@@ -22,3 +22,6 @@ add_subdirectory(ParserDataTamer)
 add_subdirectory(ParserLineInflux)
 
 add_subdirectory(PluginsZcm)
+
+# ArduPilot APBin plugin (https://github.com/ArduPilot/plotjuggler-apbin-plugins)
+add_subdirectory(DataLoadAPBin)
