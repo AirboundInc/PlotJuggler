@@ -61,6 +61,26 @@ const std::vector<const char*>& DataLoadAPBIN::compatibleFileExtensions() const
 
 bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_data)
 {
+  // Clear all persistent state from previous file loads to prevent crashes
+  // when loading multiple files in the same session
+  messages_map.clear();
+  multipliers.clear();
+  units.clear();
+  msg_name2id.clear();
+  field_name2idx.clear();
+
+  for (uint16_t i = 0; i < MAX_FORMATS; i++)
+  {
+    has_fmt[i] = false;
+    has_fmtu[i] = false;
+    has_instance[i] = false;
+    instance_idx[i] = -1;
+    instance_offset[i] = 0;
+    msg_id2name[i].clear();
+    formats[i] = {};
+    format_units[i] = {};
+  }
+
   QFile file(info->filename);
   if (!file.open(QFile::ReadOnly))
   {
