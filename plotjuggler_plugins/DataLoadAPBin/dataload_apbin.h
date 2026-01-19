@@ -17,6 +17,7 @@
 #include <QtPlugin>
 #include "PlotJuggler/dataloader_base.h"
 #include "logformat.h"
+#include "apbin_messages_dialog.h"
 
 using namespace PJ;
 
@@ -85,6 +86,8 @@ private:
   // field name <-> field idx mapping
   std::map<std::string, std::map<std::string, uint8_t>> field_name2idx;
 
+  // log messages
+  std::vector<APBinMessage> log_messages;
 
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);

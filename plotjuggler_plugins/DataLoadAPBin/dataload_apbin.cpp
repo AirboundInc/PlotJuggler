@@ -68,6 +68,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   units.clear();
   msg_name2id.clear();
   field_name2idx.clear();
+  log_messages.clear();
 
   for (uint16_t i = 0; i < MAX_FORMATS; i++)
   {
@@ -403,8 +404,26 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     }
     if ( memcmp(fmt.name, "MSG", 3) == 0 )
     {
+      // Parse MSG message to extract timestamp and message text
+      // MSG format is typically "QZ" with labels "TimeUS,Message"
+      // Q = uint64_t (8 bytes), Z = char[64]
+      APBinMessage log_msg;
+
+      // Skip header (3 bytes) to get to TimeUS
+      const uint8_t* msg_ptr = buf + total_bytes_used + LOG_PACKET_HEADER_LEN;
+      log_msg.timestamp_us = *reinterpret_cast<const uint64_t*>(msg_ptr);
+      msg_ptr += sizeof(uint64_t);
+
+      // Extract message text (64 bytes max, null-terminated)
+      const char* msg_text = reinterpret_cast<const char*>(msg_ptr);
+      // Find the actual string length (up to 64 chars)
+      size_t msg_len = strnlen(msg_text, 64);
+      log_msg.message.assign(msg_text, msg_len);
+
+      log_messages.push_back(std::move(log_msg));
+
       total_bytes_used += fmt.length;
-      msgs_skipped++;
+      msgs_read++;
       continue;
     }
     if ( memcmp(fmt.name, "PARM", 4) == 0 )
@@ -656,6 +675,15 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   std::printf("\n  Read messages:\t%d", msgs_read);
   std::printf("\n  Skipped messages:\t%d", msgs_skipped);
   std::printf("\n  Skipped bytes:\t%d from %d bytes\n\n", bytes_skipped, len);
+
+  // Show log messages dialog if there are any messages
+  if (!log_messages.empty())
+  {
+    APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages);
+    dialog->restoreSettings();
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+  }
 
   return true;
 }
