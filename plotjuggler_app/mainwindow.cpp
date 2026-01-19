@@ -1308,6 +1308,19 @@ bool MainWindow::loadDataFromFiles(QStringList filenames)
   {
     updateRecentDataMenu(loaded_filenames);
     linkedZoomOut();
+
+    // Update window title with loaded filename(s)
+    QString title = "PlotJuggler - ";
+    if (loaded_filenames.size() == 1)
+    {
+      title += QFileInfo(loaded_filenames[0]).fileName();
+    }
+    else
+    {
+      title += QString("%1 files").arg(loaded_filenames.size());
+    }
+    setWindowTitle(title);
+
     return true;
   }
   return false;
