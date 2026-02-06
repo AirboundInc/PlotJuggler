@@ -86,8 +86,11 @@ private:
   // field name <-> field idx mapping
   std::map<std::string, std::map<std::string, uint8_t>> field_name2idx;
 
-  // log messages
+  // log messages (MSG messages)
   std::vector<APBinMessage> log_messages;
+
+  // parameters (PARM messages) - using map to keep only the latest value per parameter
+  std::map<std::string, float> log_parameters;
 
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);

@@ -69,6 +69,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   msg_name2id.clear();
   field_name2idx.clear();
   log_messages.clear();
+  log_parameters.clear();
 
   for (uint16_t i = 0; i < MAX_FORMATS; i++)
   {
@@ -428,8 +429,28 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     }
     if ( memcmp(fmt.name, "PARM", 4) == 0 )
     {
+      // Parse PARM message to extract parameter name and value
+      // PARM format is typically "QNf" with labels "TimeUS,Name,Value"
+      // Q = uint64_t (8 bytes), N = char[16], f = float (4 bytes)
+      const uint8_t* msg_ptr = buf + total_bytes_used + LOG_PACKET_HEADER_LEN;
+
+      // Skip TimeUS (8 bytes) to get to Name
+      msg_ptr += sizeof(uint64_t);
+
+      // Extract parameter name (16 bytes max, null-terminated)
+      const char* param_name = reinterpret_cast<const char*>(msg_ptr);
+      size_t name_len = strnlen(param_name, 16);
+      std::string name(param_name, name_len);
+      msg_ptr += 16;
+
+      // Extract parameter value (float)
+      float value = *reinterpret_cast<const float*>(msg_ptr);
+
+      // Store in map (overwrites previous value if parameter appears multiple times)
+      log_parameters[name] = value;
+
       total_bytes_used += fmt.length;
-      msgs_skipped++;
+      msgs_read++;
       continue;
     }
 
@@ -676,10 +697,10 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   std::printf("\n  Skipped messages:\t%d", msgs_skipped);
   std::printf("\n  Skipped bytes:\t%d from %d bytes\n\n", bytes_skipped, len);
 
-  // Show log messages dialog if there are any messages
-  if (!log_messages.empty())
+  // Show log info dialog if there are any messages or parameters
+  if (!log_messages.empty() || !log_parameters.empty())
   {
-    APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages);
+    APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages, log_parameters);
     dialog->restoreSettings();
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();

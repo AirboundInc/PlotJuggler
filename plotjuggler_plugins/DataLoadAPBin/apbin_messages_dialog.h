@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QString>
 #include <vector>
+#include <map>
 
 namespace Ui
 {
@@ -15,12 +16,20 @@ struct APBinMessage
   std::string message;
 };
 
+struct APBinParameter
+{
+  std::string name;
+  float value;
+};
+
 class APBinMessagesDialog : public QDialog
 {
   Q_OBJECT
 
 public:
-  explicit APBinMessagesDialog(const std::vector<APBinMessage>& messages, QWidget* parent = nullptr);
+  explicit APBinMessagesDialog(const std::vector<APBinMessage>& messages,
+                               const std::map<std::string, float>& parameters,
+                               QWidget* parent = nullptr);
 
   void restoreSettings();
 
