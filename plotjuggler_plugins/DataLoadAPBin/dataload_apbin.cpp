@@ -19,6 +19,8 @@
 #include <QInputDialog>
 #include <QElapsedTimer>
 #include <QDebug>
+#include <QMainWindow>
+#include <QApplication>
 #include <chrono>
 #include <cmath>
 #include <array>
@@ -49,8 +51,16 @@ bool is_nearly(double val, int val2)
 }
 
 
-DataLoadAPBIN::DataLoadAPBIN()
+DataLoadAPBIN::DataLoadAPBIN() : _main_win(nullptr)
 {
+  for (QWidget* widget : qApp->topLevelWidgets())
+  {
+    if (widget->inherits("QMainWindow"))
+    {
+      _main_win = widget;
+      break;
+    }
+  }
   extensions.push_back("BIN");  // TODO : this doesn't work for now as tolower() is hardcoded.
 }
 
@@ -700,7 +710,8 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   // Show log info dialog if there are any messages or parameters
   if (!log_messages.empty() || !log_parameters.empty())
   {
-    APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages, log_parameters);
+    APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages, log_parameters, _main_win);
+    dialog->setWindowTitle(QString("APBin file %1").arg(info->filename));
     dialog->restoreSettings();
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();

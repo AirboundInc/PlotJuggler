@@ -44,6 +44,7 @@ protected:
 
 private:
   std::vector<const char*> extensions;
+  QWidget* _main_win;
 
 
   // message_data holds the data of a message for each timestamp
