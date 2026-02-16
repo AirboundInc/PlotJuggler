@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
+      - airbound-main
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     types: [opened, synchronize]
 
