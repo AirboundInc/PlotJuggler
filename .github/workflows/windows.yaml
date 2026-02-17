@@ -19,6 +19,8 @@ jobs:
 
   windows-build:
     runs-on: ${{ matrix.windows-version }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
