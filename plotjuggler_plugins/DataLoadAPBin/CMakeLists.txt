@@ -26,3 +26,5 @@ target_compile_definitions(DataLoadAPBin PRIVATE QT_PLUGIN)
 # target_compile_definitions(DataLoadAPBin PRIVATE LABEL_WITH_UNIT)
 
 install(TARGETS DataLoadAPBin DESTINATION ${PJ_PLUGIN_INSTALL_DIRECTORY})
+
+add_subdirectory(benchmark)
