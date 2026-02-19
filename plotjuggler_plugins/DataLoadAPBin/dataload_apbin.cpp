@@ -24,6 +24,8 @@
 #include <chrono>
 #include <cmath>
 #include <array>
+#include <future>
+#include <thread>
 
 
 // Debugging 
@@ -122,6 +124,15 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   uint32_t msgs_skipped{ 0 };
   uint32_t msgs_read{ 0 };
 
+  // Index of data messages discovered during Pass 1, decoded in parallel during Pass 2.
+  struct MsgRecord
+  {
+    uint32_t offset;  // byte offset of the message start (including header)
+    uint8_t type;     // message id
+  };
+  std::vector<MsgRecord> pending_msgs;
+  pending_msgs.reserve(512 * 1024);
+
   QElapsedTimer timer;
   timer.start();
 
@@ -155,7 +166,8 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     // check if end of file is reached
     if (len - total_bytes_used < LOG_PACKET_HEADER_LEN)
     {
-      progress_dialog.setValue(100);
+      // Pass 1 complete — set to 50%; Pass 2 (parallel decode) will bring it to 85%.
+      progress_dialog.setValue(50);
       bytes_skipped += len - total_bytes_used;
       break;
     }
@@ -285,7 +297,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     //  - if we reached the end of the log, just end
     if (len - total_bytes_used < fmt.length)
     {
-      progress_dialog.setValue(100);
+      progress_dialog.setValue(50);
       bytes_skipped += len - total_bytes_used;
       break;
     }
@@ -464,20 +476,97 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       continue;
     }
 
-    #ifdef DEBUG_RUNTIME
-      auto other_start = std::chrono::high_resolution_clock::now();
-    #endif
-
-    handle_message_received(fmt, &buf[total_bytes_used]);
+    // Index this data message for parallel decoding in Pass 2.
+    pending_msgs.push_back({total_bytes_used, type});
 
     total_bytes_used += fmt.length;
-    msgs_read++; // todo: this is incorrect, if message is read incomplete
-    
-    #ifdef DEBUG_RUNTIME
-      auto other_end = std::chrono::high_resolution_clock::now();
-      other_ms += (other_end - other_start);
-    #endif
   }
+
+
+  // -------------------- Pass 2: parallel message decode -------------------- //
+  #ifdef DEBUG_RUNTIME
+    auto other_start = std::chrono::high_resolution_clock::now();
+  #endif
+  {
+    // Decide thread count: at least 1, at most hardware threads capped at 8.
+    // For small logs use a single thread to avoid thread-spawn overhead.
+    const unsigned int hw_threads = std::max(1u, std::thread::hardware_concurrency());
+    const unsigned int num_threads =
+        (pending_msgs.size() > 10000) ? std::min(hw_threads, 8u) : 1u;
+
+    const size_t total_msgs = pending_msgs.size();
+    const size_t chunk = (total_msgs + num_threads - 1) / num_threads;
+
+    // One private MessagesMap per worker thread.
+    std::vector<MessagesMap> local_maps(num_threads);
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(num_threads);
+
+    for (unsigned int t = 0; t < num_threads; t++)
+    {
+      const size_t start = t * chunk;
+      const size_t end = std::min(start + chunk, total_msgs);
+      if (start >= total_msgs)
+        break;
+
+      // All arrays read by the lambda (formats, msg_id2name, has_instance, etc.)
+      // are fully populated from Pass 1 and are read-only here — no locking needed.
+      futures.push_back(std::async(std::launch::async, [&, t, start, end]() {
+        for (size_t i = start; i < end; i++)
+        {
+          const MsgRecord& rec = pending_msgs[i];
+          handle_message_received(formats[rec.type], &buf[rec.offset], local_maps[t]);
+        }
+      }));
+    }
+
+    for (auto& f : futures)
+      f.get();
+
+    // Merge thread-local maps into messages_map in thread order so that
+    // timestamps remain sorted (the file is written chronologically).
+    for (auto& local_map : local_maps)
+    {
+      for (auto& msg_it : local_map)
+      {
+        const std::string& msg_name = msg_it.first;
+        for (auto& inst_it : msg_it.second)
+        {
+          const int8_t instance = inst_it.first;
+          message_data& src = inst_it.second;
+
+          auto& dest = messages_map[msg_name][instance];
+          if (dest.empty())
+          {
+            dest = std::move(src);
+          }
+          else
+          {
+            // Append each field's value vector from this thread's chunk.
+            for (size_t fi = 0; fi < dest.size(); fi++)
+            {
+              auto& dv = dest[fi].second;
+              auto& sv = src[fi].second;
+              dv.insert(dv.end(),
+                        std::make_move_iterator(sv.begin()),
+                        std::make_move_iterator(sv.end()));
+            }
+          }
+        }
+      }
+    }
+
+    msgs_read += static_cast<uint32_t>(total_msgs);
+  }
+
+  progress_dialog.setValue(85);
+  QApplication::processEvents();
+
+  #ifdef DEBUG_RUNTIME
+    auto other_end = std::chrono::high_resolution_clock::now();
+    other_ms += (other_end - other_start);
+  #endif
 
 
   // -------------------- process UNITs -------------------- //
@@ -724,35 +813,36 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
 
 
 
-void DataLoadAPBIN::handle_message_received(const struct log_Format& fmt, const uint8_t* msg)
+void DataLoadAPBIN::handle_message_received(const struct log_Format& fmt, const uint8_t* msg,
+                                            MessagesMap& dest_map)
 {
   // message id
   const uint8_t& msg_id = fmt.type;
 
   // message name
   const std::string& msg_name = msg_id2name[msg_id];
-  
+
   // instances
   int8_t instance = 0;
-  if ( has_instance[msg_id] )
+  if (has_instance[msg_id])
   {
     instance = get_instance(fmt, msg);
   }
 
-  // check if message already exists in messages_map
-  auto message_it = messages_map.find(msg_name);
-  if (message_it == messages_map.end())
+  // check if message already exists in dest_map
+  auto message_it = dest_map.find(msg_name);
+  if (message_it == dest_map.end())
   {
-    messages_map[msg_name];
+    dest_map[msg_name];
   }
-  
-  // check if instance already exists in message_map[msg_name]
-  auto instance_it = messages_map[msg_name].find(instance);
-  if (instance_it == messages_map[msg_name].end())
+
+  // check if instance already exists in dest_map[msg_name]
+  auto instance_it = dest_map[msg_name].find(instance);
+  if (instance_it == dest_map[msg_name].end())
   {
-    messages_map[msg_name][instance] = create_message_data(fmt);
+    dest_map[msg_name][instance] = create_message_data(fmt);
   }
-  message_data& msg_data = messages_map[msg_name][instance];
+  message_data& msg_data = dest_map[msg_name][instance];
 
   uint32_t msg_offset = LOG_PACKET_HEADER_LEN;  // discard header
 
@@ -988,55 +1078,60 @@ std::string DataLoadAPBIN::get_unit(const std::string& msg_name, const std::stri
 
 void DataLoadAPBIN::apply_multipliers(void)
 {
-  // Go through all messages, instances, fields and apply the correct multiplier from FMTU and MULT
+  // Collect message names so we can dispatch one async task per message type.
+  // Each task only writes to its own slice of messages_map — no locking needed.
+  std::vector<std::string> msg_names;
+  msg_names.reserve(messages_map.size());
+  for (const auto& msg_it : messages_map)
+    msg_names.push_back(msg_it.first);
 
-  // iterate through messages
-  for (auto& msg_it : messages_map)
+  std::vector<std::future<void>> futures;
+  futures.reserve(msg_names.size());
+
+  for (const auto& msg_name : msg_names)
   {
-    const std::string& msg_name = msg_it.first;
+    futures.push_back(std::async(std::launch::async, [&, msg_name]() {
+      const uint8_t msg_id = msg_name2id.at(msg_name);
 
-    // get message id for message name
-    const uint8_t& msg_id = msg_name2id[msg_name];
-
-    // check if FMTU exists
-    if ( !has_fmtu[msg_id] )
-    {
-      std::fprintf(stderr, "WARNING: No FMTU for message %s found. Can not apply multipliers!\n", msg_name.c_str());
-      continue;
-    }
-
-    // iterate through instances
-    auto& instances_map = msg_it.second;
-    for (auto& inst_it : instances_map)
-    {
-      message_data& msg_data = inst_it.second;
-
-      // iterate through fields
-      for (int idx = 0; idx < msg_data.size(); idx++)
+      if (!has_fmtu[msg_id])
       {
-        // get multiplier descriptor char
-        const char& field_multiplier_char = format_units[msg_id].multipliers[idx];
-
-        // get multiplier double
-        const auto multiplier_it = multipliers.find(field_multiplier_char);
-        if ( multiplier_it == multipliers.end() )
-        {
-          std::fprintf(stderr, "WARNING: No multiplier for multiplier-id %c found! Can not apply multiplier in message: %s\n", field_multiplier_char, msg_name.c_str());
-          continue;
-        }
-        const double field_multiplier = multiplier_it->second;
-
-        // check if multiplier is 0 or 1
-        if ( is_nearly(field_multiplier, 0) || is_nearly(field_multiplier, 1) )
-        {
-          continue;
-        }
-
-        std::vector<double>& field_data = msg_data[idx].second;
-        std::transform(field_data.begin(), field_data.end(), field_data.begin(), std::bind(std::multiplies<double>(), std::placeholders::_1, field_multiplier));
+        std::fprintf(stderr, "WARNING: No FMTU for message %s found. Can not apply multipliers!\n",
+                     msg_name.c_str());
+        return;
       }
-    }
+
+      auto& instances_map = messages_map.at(msg_name);
+      for (auto& inst_it : instances_map)
+      {
+        message_data& msg_data = inst_it.second;
+        for (int idx = 0; idx < static_cast<int>(msg_data.size()); idx++)
+        {
+          const char field_multiplier_char = format_units[msg_id].multipliers[idx];
+
+          const auto multiplier_it = multipliers.find(field_multiplier_char);
+          if (multiplier_it == multipliers.end())
+          {
+            std::fprintf(stderr,
+                         "WARNING: No multiplier for multiplier-id %c found! Can not apply "
+                         "multiplier in message: %s\n",
+                         field_multiplier_char, msg_name.c_str());
+            continue;
+          }
+          const double field_multiplier = multiplier_it->second;
+
+          if (is_nearly(field_multiplier, 0) || is_nearly(field_multiplier, 1))
+            continue;
+
+          std::vector<double>& field_data = msg_data[idx].second;
+          std::transform(field_data.begin(), field_data.end(), field_data.begin(),
+                         [field_multiplier](double v) { return v * field_multiplier; });
+        }
+      }
+    }));
   }
+
+  for (auto& f : futures)
+    f.get();
 }
 
 
@@ -1060,9 +1155,6 @@ void DataLoadAPBIN::apply_timesync(void)
   // todo: change that?
   const message_data& gps_msg_data = messages_map["GPS"][0];
 
-  // counter
-  int idx;
-  
   // get needed field indexes
   const auto& gps_time_idx = field_name2idx["GPS"]["TimeUS"];
   const auto& gps_week_idx = field_name2idx["GPS"]["GWk"]; // GWk -> GPS week
@@ -1083,27 +1175,37 @@ void DataLoadAPBIN::apply_timesync(void)
   const double time_offset = unix_time - log_time;
 
 
-  // iterate through messages
-  for (auto& msg_it : messages_map)
+  // Collect (msg_name, time_field_index) pairs for messages that have TimeUS.
+  // The time_offset scalar is captured by value — fully safe across threads.
+  std::vector<std::pair<std::string, uint8_t>> timed_msgs;
+  timed_msgs.reserve(messages_map.size());
+  for (const auto& msg_it : messages_map)
   {
     const auto& msg_name = msg_it.first;
-
-    auto time_idx_it = field_name2idx[msg_name].find("TimeUS");
-    if (time_idx_it == field_name2idx[msg_name].end())
-    {
-      continue;
-    }
-    auto& time_idx = time_idx_it->second;
-
-    // iterate through instances
-    auto& instances_map = msg_it.second;
-    for (auto& inst_it : instances_map)
-    {
-      // add time offset
-      message_data& msg_data = inst_it.second;
-
-      std::vector<double>& timestamps = msg_data[time_idx].second;
-      std::transform(timestamps.begin(), timestamps.end(), timestamps.begin(), std::bind(std::plus<double>(), std::placeholders::_1, time_offset));
-    }
+    const auto time_idx_it = field_name2idx[msg_name].find("TimeUS");
+    if (time_idx_it != field_name2idx[msg_name].end())
+      timed_msgs.push_back({msg_name, time_idx_it->second});
   }
+
+  std::vector<std::future<void>> futures;
+  futures.reserve(timed_msgs.size());
+
+  for (const auto& entry : timed_msgs)
+  {
+    futures.push_back(std::async(std::launch::async, [&, entry, time_offset]() {
+      const std::string& msg_name = entry.first;
+      const uint8_t time_idx = entry.second;
+
+      auto& instances_map = messages_map.at(msg_name);
+      for (auto& inst_it : instances_map)
+      {
+        std::vector<double>& timestamps = inst_it.second[time_idx].second;
+        std::transform(timestamps.begin(), timestamps.end(), timestamps.begin(),
+                       [time_offset](double t) { return t + time_offset; });
+      }
+    }));
+  }
+
+  for (auto& f : futures)
+    f.get();
 }

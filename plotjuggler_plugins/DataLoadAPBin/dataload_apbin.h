@@ -52,11 +52,14 @@ private:
   //  - std::vector:  field data (fields)
   typedef std::vector<std::pair<std::string, std::vector<double>>> message_data;
 
+  // MessagesMap: message name -> instance number -> message_data
+  using MessagesMap = std::map<std::string, std::map<int8_t, message_data>>;
+
   // messages_map is a nested map which contains all messages
   //  - key1:   message name
   //  - key2:   instance number
   //  - value:  message_data
-  std::map<std::string, std::map<int8_t, message_data>> messages_map;
+  MessagesMap messages_map;
 
 
   // multipliers and units from MULT and UNIT messages
@@ -93,8 +96,8 @@ private:
   // parameters (PARM messages) - using map to keep only the latest value per parameter
   std::map<std::string, float> log_parameters;
 
-  // fill the message_data for a message according to the message format
-  void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);
+  // fill the message_data for a message according to the message format into the given map
+  void handle_message_received(const struct log_Format& fmt, const uint8_t* msg, MessagesMap& dest_map);
 
   // create message_data for a message
   message_data create_message_data(const struct log_Format& fmt);
