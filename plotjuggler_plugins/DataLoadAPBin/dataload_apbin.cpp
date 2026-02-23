@@ -80,6 +80,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   field_name2idx.clear();
   log_messages.clear();
   log_parameters.clear();
+  parm_entries.clear();
 
   for (uint16_t i = 0; i < MAX_FORMATS; i++)
   {
@@ -444,7 +445,9 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       // Q = uint64_t (8 bytes), N = char[16], f = float (4 bytes)
       const uint8_t* msg_ptr = buf + total_bytes_used + LOG_PACKET_HEADER_LEN;
 
-      // Skip TimeUS (8 bytes) to get to Name
+      // Extract TimeUS and convert µs → s (matches the 1e-6 multiplier applied to
+      // TimeUS fields in messages_map before apply_timesync runs)
+      double timestamp = static_cast<double>(*reinterpret_cast<const uint64_t*>(msg_ptr)) * 1e-6;
       msg_ptr += sizeof(uint64_t);
 
       // Extract parameter name (16 bytes max, null-terminated)
@@ -456,8 +459,11 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       // Extract parameter value (float)
       float value = *reinterpret_cast<const float*>(msg_ptr);
 
-      // Store in map (overwrites previous value if parameter appears multiple times)
+      // Keep latest value for dialog
       log_parameters[name] = value;
+
+      // Store all entries for time-series plotting
+      parm_entries.push_back({timestamp, name, value});
 
       total_bytes_used += fmt.length;
       msgs_read++;
@@ -676,6 +682,14 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       }
     }
   }
+
+  // Publish PARM entries as time series: /PARM/<name>
+  for (const auto& entry : parm_entries)
+  {
+    auto series = plot_data.addNumeric("/_PARM/" + entry.name);
+    series->second.pushBack(PlotData::Point(entry.timestamp, static_cast<double>(entry.value)));
+  }
+
   #ifdef DEBUG_RUNTIME
     auto publish_end = std::chrono::high_resolution_clock::now();
     publish_ms += (publish_end - publish_start);
@@ -1105,5 +1119,10 @@ void DataLoadAPBIN::apply_timesync(void)
       std::vector<double>& timestamps = msg_data[time_idx].second;
       std::transform(timestamps.begin(), timestamps.end(), timestamps.begin(), std::bind(std::plus<double>(), std::placeholders::_1, time_offset));
     }
+  }
+
+  for (auto& entry : parm_entries)
+  {
+    entry.timestamp += time_offset;
   }
 }

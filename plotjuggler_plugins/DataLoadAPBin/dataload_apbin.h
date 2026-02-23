@@ -93,6 +93,10 @@ private:
   // parameters (PARM messages) - using map to keep only the latest value per parameter
   std::map<std::string, float> log_parameters;
 
+  // all PARM entries with timestamps (for time-series plotting)
+  struct ParmEntry { double timestamp; std::string name; float value; };
+  std::vector<ParmEntry> parm_entries;
+
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);
 
