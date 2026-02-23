@@ -9,7 +9,7 @@
 
 #include <memory>
 #include <string>
-#include <deque>
+#include <vector>
 #include <type_traits>
 #include <cmath>
 #include <cstdlib>
@@ -139,8 +139,8 @@ public:
     ASYNC_BUFFER_CAPACITY = 1024
   };
 
-  typedef typename std::deque<Point>::iterator Iterator;
-  typedef typename std::deque<Point>::const_iterator ConstIterator;
+  typedef typename std::vector<Point>::iterator Iterator;
+  typedef typename std::vector<Point>::const_iterator ConstIterator;
   typedef Value ValueT;
 
   PlotDataBase(const std::string& name, PlotGroup::Ptr group)
@@ -400,13 +400,20 @@ public:
         _range_y_dirty = true;
       }
     }
-    _points.pop_front();
+    _points.erase(_points.begin());
+  }
+
+  // Pre-allocate storage for at least n points. Call this before bulk-inserting
+  // a known number of points to avoid repeated reallocation during pushBack.
+  void reservePoints(size_t n)
+  {
+    _points.reserve(n);
   }
 
 protected:
   std::string _name;
   Attributes _attributes;
-  std::deque<Point> _points;
+  std::vector<Point> _points;
 
   mutable Range _range_x;
   mutable Range _range_y;

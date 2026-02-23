@@ -28,8 +28,8 @@
 #include <thread>
 
 
-// Debugging 
-//#define DEBUG_RUNTIME
+// Debugging
+#define DEBUG_RUNTIME
 //#define DEBUG_MESSAGES
 //#define DEBUG_MULTIPLIERS
 //#define DEBUG_UNITS
@@ -108,14 +108,20 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   const uint32_t len = file_array.size();
   uint32_t total_bytes_used = 0;
 
+  // When APBIN_BENCHMARK=1, suppress all UI so the plugin can run headlessly.
+  const bool benchmark_mode = qEnvironmentVariableIsSet("APBIN_BENCHMARK");
+
   // Progress box for large file
   QProgressDialog progress_dialog;
-  progress_dialog.setLabelText("Loading ArduPilot logfile... please wait");
-  progress_dialog.setWindowModality(Qt::ApplicationModal);
-  progress_dialog.setRange(0, 100);
-  progress_dialog.setAutoClose(true);
-  progress_dialog.setAutoReset(true);
-  progress_dialog.show();
+  if (!benchmark_mode)
+  {
+    progress_dialog.setLabelText("Loading ArduPilot logfile... please wait");
+    progress_dialog.setWindowModality(Qt::ApplicationModal);
+    progress_dialog.setRange(0, 100);
+    progress_dialog.setAutoClose(true);
+    progress_dialog.setAutoReset(true);
+    progress_dialog.show();
+  }
 
   int progress{ 0 };
   int progress_update{ 0 };
@@ -124,14 +130,6 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   uint32_t msgs_skipped{ 0 };
   uint32_t msgs_read{ 0 };
 
-  // Index of data messages discovered during Pass 1, decoded in parallel during Pass 2.
-  struct MsgRecord
-  {
-    uint32_t offset;  // byte offset of the message start (including header)
-    uint8_t type;     // message id
-  };
-  std::vector<MsgRecord> pending_msgs;
-  pending_msgs.reserve(512 * 1024);
 
   QElapsedTimer timer;
   timer.start();
@@ -141,33 +139,36 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     std::chrono::duration<double, std::milli> fmtu_ms{ 0 };
     std::chrono::duration<double, std::milli> mult_ms{ 0 };
     std::chrono::duration<double, std::milli> unit_ms{ 0 };
-    std::chrono::duration<double, std::milli> other_ms{ 0 };
+    std::chrono::duration<double, std::milli> other_ms{ 0 };  // decode (serial)
     std::chrono::duration<double, std::milli> process_units_ms{ 0 };
     std::chrono::duration<double, std::milli> apply_mult_ms{ 0 };
     std::chrono::duration<double, std::milli> apply_tsync_ms{ 0 };
     std::chrono::duration<double, std::milli> publish_ms{ 0 };
+    auto other_start = std::chrono::high_resolution_clock::now();
   #endif
 
   while (true)
   {
     // update the progression dialog box
-    progress_update = static_cast<int>((static_cast<double>(total_bytes_used) / static_cast<double>(file_size)) * 100.0);
-    if ( (progress_update - 4) > progress )
+    if (!benchmark_mode)
     {
-      progress = progress_update;
-      progress_dialog.setValue(progress);
-      QApplication::processEvents();
-      if (progress_dialog.wasCanceled())
+      progress_update = static_cast<int>((static_cast<double>(total_bytes_used) / static_cast<double>(file_size)) * 100.0);
+      if ( (progress_update - 4) > progress )
       {
-        return false;
+        progress = progress_update;
+        progress_dialog.setValue(progress);
+        QApplication::processEvents();
+        if (progress_dialog.wasCanceled())
+        {
+          return false;
+        }
       }
     }
 
     // check if end of file is reached
     if (len - total_bytes_used < LOG_PACKET_HEADER_LEN)
     {
-      // Pass 1 complete — set to 50%; Pass 2 (parallel decode) will bring it to 85%.
-      progress_dialog.setValue(50);
+      if (!benchmark_mode) progress_dialog.setValue(85);
       bytes_skipped += len - total_bytes_used;
       break;
     }
@@ -297,7 +298,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     //  - if we reached the end of the log, just end
     if (len - total_bytes_used < fmt.length)
     {
-      progress_dialog.setValue(50);
+      if (!benchmark_mode) progress_dialog.setValue(85);
       bytes_skipped += len - total_bytes_used;
       break;
     }
@@ -476,92 +477,17 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       continue;
     }
 
-    // Index this data message for parallel decoding in Pass 2.
-    pending_msgs.push_back({total_bytes_used, type});
-
+    // decode data message inline (sequential, correct ordering)
+    handle_message_received(formats[type], &buf[total_bytes_used], messages_map);
     total_bytes_used += fmt.length;
+    msgs_read++;
   }
 
-
-  // -------------------- Pass 2: parallel message decode -------------------- //
-  #ifdef DEBUG_RUNTIME
-    auto other_start = std::chrono::high_resolution_clock::now();
-  #endif
+  if (!benchmark_mode)
   {
-    // Decide thread count: at least 1, at most hardware threads capped at 8.
-    // For small logs use a single thread to avoid thread-spawn overhead.
-    const unsigned int hw_threads = std::max(1u, std::thread::hardware_concurrency());
-    const unsigned int num_threads =
-        (pending_msgs.size() > 10000) ? std::min(hw_threads, 8u) : 1u;
-
-    const size_t total_msgs = pending_msgs.size();
-    const size_t chunk = (total_msgs + num_threads - 1) / num_threads;
-
-    // One private MessagesMap per worker thread.
-    std::vector<MessagesMap> local_maps(num_threads);
-
-    std::vector<std::future<void>> futures;
-    futures.reserve(num_threads);
-
-    for (unsigned int t = 0; t < num_threads; t++)
-    {
-      const size_t start = t * chunk;
-      const size_t end = std::min(start + chunk, total_msgs);
-      if (start >= total_msgs)
-        break;
-
-      // All arrays read by the lambda (formats, msg_id2name, has_instance, etc.)
-      // are fully populated from Pass 1 and are read-only here — no locking needed.
-      futures.push_back(std::async(std::launch::async, [&, t, start, end]() {
-        for (size_t i = start; i < end; i++)
-        {
-          const MsgRecord& rec = pending_msgs[i];
-          handle_message_received(formats[rec.type], &buf[rec.offset], local_maps[t]);
-        }
-      }));
-    }
-
-    for (auto& f : futures)
-      f.get();
-
-    // Merge thread-local maps into messages_map in thread order so that
-    // timestamps remain sorted (the file is written chronologically).
-    for (auto& local_map : local_maps)
-    {
-      for (auto& msg_it : local_map)
-      {
-        const std::string& msg_name = msg_it.first;
-        for (auto& inst_it : msg_it.second)
-        {
-          const int8_t instance = inst_it.first;
-          message_data& src = inst_it.second;
-
-          auto& dest = messages_map[msg_name][instance];
-          if (dest.empty())
-          {
-            dest = std::move(src);
-          }
-          else
-          {
-            // Append each field's value vector from this thread's chunk.
-            for (size_t fi = 0; fi < dest.size(); fi++)
-            {
-              auto& dv = dest[fi].second;
-              auto& sv = src[fi].second;
-              dv.insert(dv.end(),
-                        std::make_move_iterator(sv.begin()),
-                        std::make_move_iterator(sv.end()));
-            }
-          }
-        }
-      }
-    }
-
-    msgs_read += static_cast<uint32_t>(total_msgs);
+    progress_dialog.setValue(85);
+    QApplication::processEvents();
   }
-
-  progress_dialog.setValue(85);
-  QApplication::processEvents();
 
   #ifdef DEBUG_RUNTIME
     auto other_end = std::chrono::high_resolution_clock::now();
@@ -694,38 +620,80 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   #ifdef DEBUG_RUNTIME
     auto publish_start = std::chrono::high_resolution_clock::now();
   #endif
-  // iterate through messages
+
+  const unsigned int hw_threads = std::max(1u, std::thread::hardware_concurrency());
+
+  // ---- Parallel Publish ----
+  // The Publish step (inserting data into PlotJuggler series) is the dominant
+  // cost (~70% of total time). Each series is independent, so we can fill them
+  // in parallel. However, plot_data.addNumeric() is not thread-safe because it
+  // inserts into a shared unordered_map. Strategy:
+  //   Phase A (single-threaded): pre-count series, reserve map capacity to
+  //             prevent rehash, create all series, collect work items.
+  //   Phase B (parallel):        fill each pre-allocated series concurrently.
+  //             Each thread owns a disjoint slice of work_items → no data races.
+
+  struct PubWork
+  {
+    PlotData* series;
+    const std::vector<double>* timestamps;
+    const std::vector<double>* values;
+  };
+
+  // Phase A-1: count how many series we will publish (no inserts yet).
+  size_t total_series = 0;
   for (const auto& msg_it : messages_map)
   {
     const std::string& msg_name = msg_it.first;
+    if (field_name2idx[msg_name].find("TimeUS") == field_name2idx[msg_name].end())
+      continue;
+    const uint8_t& msg_id = msg_name2id[msg_name];
+    const uint8_t time_idx = static_cast<uint8_t>(field_name2idx[msg_name].at("TimeUS"));
+    for (const auto& inst_it : msg_it.second)
+    {
+      const message_data& md = inst_it.second;
+      for (size_t idx = 0; idx < md.size(); idx++)
+      {
+        if (idx == time_idx || (has_instance[msg_id] && idx == static_cast<size_t>(instance_idx[msg_id])))
+          continue;
+        total_series++;
+      }
+    }
+  }
 
-    // get message id for message name
+  // Reserve capacity so that addNumeric() calls below never trigger a rehash.
+  // After reserve(), existing iterators/pointers remain valid for the lifetime
+  // of Phase B (no further inserts happen during the parallel fill).
+  plot_data.numeric.reserve(total_series * 2);
+
+  // Phase A-2: create all series (single-threaded) and collect work items.
+  std::vector<PubWork> work_items;
+  work_items.reserve(total_series);
+
+  for (const auto& msg_it : messages_map)
+  {
+    const std::string& msg_name = msg_it.first;
     const uint8_t& msg_id = msg_name2id[msg_name];
 
-    // only publish messages to plotjuggler, which have the "TimeUS" field!
     auto time_idx_it = field_name2idx[msg_name].find("TimeUS");
     if (time_idx_it == field_name2idx[msg_name].end())
     {
       std::printf("Ignoring message '%s' because it has no 'TimeUS' field!\n", msg_name.c_str());
       continue;
     }
-    
-    // iterate through instances
+
+    const uint8_t time_idx = static_cast<uint8_t>(time_idx_it->second);
     const auto& instances_map = msg_it.second;
+
     for (const auto& inst_it : instances_map)
     {
       const message_data& msg_data = inst_it.second;
-
-      // iterate through fields
-
-      // extract timestamps from message data
-      const uint8_t& time_idx = field_name2idx[msg_name]["TimeUS"];
       const std::vector<double>& timestamps = msg_data[time_idx].second;
 
       size_t idx = 0;
       for (const auto& field : msg_data)
       {
-        if ( idx == time_idx || ( has_instance[msg_id] && (idx == instance_idx[msg_id]) ) )
+        if (idx == time_idx || (has_instance[msg_id] && idx == static_cast<size_t>(instance_idx[msg_id])))
         {
           idx++;
           continue;
@@ -735,57 +703,90 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
         const std::string& field_name = field.first;
 
         std::string series_name;
-        
-        if ( !has_instance[msg_id] )
-        {
+        if (!has_instance[msg_id])
           series_name = "/" + msg_name + "/" + field_name;
-        }
         else
-        {
           series_name = "/" + msg_name + "/" + instance_name + "/" + field_name;
-        }
 
-        #ifdef LABEL_WITH_UNIT
-          std::string unit_str = get_unit(msg_name, field_name);
-          if ( !unit_str.empty() )
-          {
-            series_name = series_name + "\t[" + unit_str + "]";
-          }
-        #endif
-                
-        auto series = plot_data.addNumeric(series_name);
+#ifdef LABEL_WITH_UNIT
+        std::string unit_str = get_unit(msg_name, field_name);
+        if (!unit_str.empty())
+          series_name = series_name + "\t[" + unit_str + "]";
+#endif
 
-        for (size_t i = 0; i < field.second.size(); i++)
-        {
-          const double& msg_time = timestamps[i];
-          PlotData::Point point(msg_time, field.second[i]);
-          series->second.pushBack(point);
-        }
+        auto series_it = plot_data.addNumeric(series_name);
+        // Pre-allocate the underlying vector so Phase B writes never reallocate.
+        series_it->second.reservePoints(field.second.size());
+        work_items.push_back({&series_it->second, &timestamps, &field.second});
         idx++;
       }
     }
   }
+
+  // Phase B: fill all series in parallel.
+  {
+    const size_t n_work = work_items.size();
+    const unsigned int n_threads =
+        (n_work > 32) ? std::min(hw_threads, 8u) : 1u;
+    const size_t chunk = (n_work + n_threads - 1) / n_threads;
+
+    std::vector<std::future<void>> pub_futures;
+    pub_futures.reserve(n_threads);
+
+    for (unsigned int t = 0; t < n_threads; t++)
+    {
+      const size_t start = t * chunk;
+      const size_t end = std::min(start + chunk, n_work);
+      if (start >= n_work)
+        break;
+      pub_futures.push_back(std::async(std::launch::async, [&work_items, start, end]() {
+        for (size_t i = start; i < end; i++)
+        {
+          const PubWork& w = work_items[i];
+          const size_t n = w.values->size();
+          for (size_t j = 0; j < n; j++)
+            w.series->pushBack({(*w.timestamps)[j], (*w.values)[j]});
+        }
+      }));
+    }
+    for (auto& f : pub_futures)
+      f.get();
+  }
+
   #ifdef DEBUG_RUNTIME
     auto publish_end = std::chrono::high_resolution_clock::now();
     publish_ms += (publish_end - publish_start);
   #endif
 
   #ifdef DEBUG_RUNTIME
+  {
     std::chrono::duration<double, std::milli> total_ms = fmt_ms + fmtu_ms + mult_ms + unit_ms + other_ms + process_units_ms + apply_mult_ms + apply_tsync_ms + publish_ms;
-    std::printf("\n--------- DEBUG_RUNTIME ---------");
-    std::printf("\nFMT-Loading (ms): \t%.2f", fmt_ms.count());
-    std::printf("\nFMTU-Loading (ms): \t%.2f", fmtu_ms.count());
-    std::printf("\nMULT-Loading (ms): \t%.2f", mult_ms.count());
-    std::printf("\nUNIT-Loading (ms): \t%.2f", unit_ms.count());
-    std::printf("\nOTHER-Loading (ms): \t%.2f\n", other_ms.count());
 
-    std::printf("\nProcess-Units (ms):\t%.2f", process_units_ms.count());
-    std::printf("\nApply-Multipliers (ms):\t%.2f", apply_mult_ms.count());
-    std::printf("\nApply-Timesync (ms):\t%.2f", apply_tsync_ms.count());
-    std::printf("\nPublish (ms):\t\t%.2f", publish_ms.count());
-    std::printf("\n---------------------------------");
-    std::printf("\nTOTAL (ms):\t\t%.2f", total_ms.count());
-    std::printf("\n-------------- END --------------\n\n");
+    // Write to a file alongside the log so it's readable from a GUI app.
+    const std::string timing_path = info->filename.toStdString() + ".timing.txt";
+    FILE* tf = std::fopen(timing_path.c_str(), "w");
+    if (!tf) tf = stdout;
+
+    std::fprintf(tf, "--------- DEBUG_RUNTIME (PARALLEL-PUBLISH) ---------\n");
+    std::fprintf(tf, "File: %s\n", info->filename.toLocal8Bit().constData());
+    std::fprintf(tf, "Threads: %u\n", std::max(1u, std::min(std::thread::hardware_concurrency(), 8u)));
+    std::fprintf(tf, "--------------------------------------------\n");
+    std::fprintf(tf, "FMT-Loading (ms):       %.2f\n", fmt_ms.count());
+    std::fprintf(tf, "FMTU-Loading (ms):      %.2f\n", fmtu_ms.count());
+    std::fprintf(tf, "MULT-Loading (ms):      %.2f\n", mult_ms.count());
+    std::fprintf(tf, "UNIT-Loading (ms):      %.2f\n", unit_ms.count());
+    std::fprintf(tf, "Decode-Serial (ms):     %.2f\n", other_ms.count());
+    std::fprintf(tf, "--------------------------------------------\n");
+    std::fprintf(tf, "Process-Units (ms):     %.2f\n", process_units_ms.count());
+    std::fprintf(tf, "Apply-Multipliers (ms): %.2f\n", apply_mult_ms.count());
+    std::fprintf(tf, "Apply-Timesync (ms):    %.2f\n", apply_tsync_ms.count());
+    std::fprintf(tf, "Publish (ms):           %.2f\n", publish_ms.count());
+    std::fprintf(tf, "--------------------------------------------\n");
+    std::fprintf(tf, "TOTAL (ms):             %.2f\n", total_ms.count());
+    std::fprintf(tf, "--------------------------------------------\n");
+
+    if (tf != stdout) std::fclose(tf);
+  }
   #endif
   
   file.close();
@@ -797,7 +798,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
   std::printf("\n  Skipped bytes:\t%d from %d bytes\n\n", bytes_skipped, len);
 
   // Show log info dialog if there are any messages or parameters
-  if (!log_messages.empty() || !log_parameters.empty())
+  if (!benchmark_mode && (!log_messages.empty() || !log_parameters.empty()))
   {
     APBinMessagesDialog* dialog = new APBinMessagesDialog(log_messages, log_parameters, _main_win);
     dialog->setWindowTitle(QString("APBin file %1").arg(info->filename));

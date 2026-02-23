@@ -4,17 +4,10 @@
  * Usage:
  *   apbin_benchmark <plugin.dll> <logfile.BIN> [iterations=3]
  *
- * Loads the given DataLoadAPBin DLL via QPluginLoader, runs readDataFromFile
- * the requested number of times, and prints per-run and summary timings.
- * Run once with the original DLL and once with the parallel DLL to compare.
- *
- * Example:
- *   apbin_benchmark.exe original\DataLoadAPBin.dll flight.BIN 3
- *   apbin_benchmark.exe parallel\DataLoadAPBin.dll flight.BIN 3
+ * Results are written to apbin_bench_results.txt in the current directory.
  */
 
 #include <QApplication>
-#include <QDebug>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QPluginLoader>
@@ -23,15 +16,45 @@
 #include <PlotJuggler/plotdata.h>
 
 #include <algorithm>
+#include <fstream>
 #include <numeric>
+#include <sstream>
+#include <string>
+
+// Write to both the log file and stdout.  Using std::ofstream bypasses any
+// CRT/console attachment issues introduced by QApplication on Windows.
+static std::ofstream g_log;
+static void LOG(const std::string& s)
+{
+  if (g_log.is_open())
+  {
+    g_log << s;
+    g_log.flush();
+  }
+  // Also try stdout in case it works
+  fputs(s.c_str(), stdout);
+  fflush(stdout);
+}
 
 int main(int argc, char* argv[])
 {
+  // Open log file immediately — before QApplication — so diagnostics are
+  // captured even if Qt crashes during initialisation.
+  g_log.open("apbin_bench_results.txt", std::ios::out | std::ios::trunc);
+
+  LOG("apbin_benchmark started\n");
+
+  // Use the offscreen platform to avoid loading qwindows.dll, which can
+  // trigger a CFG / security-check failure when launched non-interactively.
+  qputenv("QT_QPA_PLATFORM", "offscreen");
+
   QApplication app(argc, argv);
+
+  LOG("QApplication ready\n");
 
   if (argc < 3)
   {
-    qInfo() << "Usage: apbin_benchmark <plugin.dll> <logfile.BIN> [iterations=3]";
+    LOG("Usage: apbin_benchmark <plugin.dll> <logfile.BIN> [iterations=3]\n");
     return 1;
   }
 
@@ -41,40 +64,59 @@ int main(int argc, char* argv[])
 
   if (!QFileInfo::exists(dll_path))
   {
-    qCritical() << "Plugin DLL not found:" << dll_path;
+    LOG(std::string("Plugin DLL not found: ") + argv[1] + "\n");
     return 1;
   }
   if (!QFileInfo::exists(bin_path))
   {
-    qCritical() << "BIN file not found:" << bin_path;
+    LOG(std::string("BIN file not found: ") + argv[2] + "\n");
     return 1;
   }
+
+  LOG("Loading plugin...\n");
 
   QPluginLoader loader(dll_path);
   QObject* plugin_obj = loader.instance();
   if (!plugin_obj)
   {
-    qCritical() << "Failed to load plugin:" << loader.errorString();
+    LOG(std::string("Failed to load plugin: ") +
+        loader.errorString().toLocal8Bit().constData() + "\n");
     return 1;
   }
 
   auto* data_loader = qobject_cast<PJ::DataLoader*>(plugin_obj);
   if (!data_loader)
   {
-    qCritical() << "Object does not implement the DataLoader interface.";
+    LOG("Object does not implement DataLoader.\n");
     loader.unload();
     return 1;
   }
 
-  const qint64 file_bytes = QFileInfo(bin_path).size();
-  qInfo() << "Plugin :" << data_loader->name();
-  qInfo() << "DLL    :" << QFileInfo(dll_path).absoluteFilePath();
-  qInfo() << "File   :" << bin_path;
-  qInfo() << QString("Size   : %1 MB").arg(file_bytes / 1024.0 / 1024.0, 0, 'f', 2);
-  qInfo() << "Runs   :" << iterations;
-  qInfo() << "---------------------------------------";
+  LOG("Plugin loaded OK\n");
 
-  QVector<qint64> times;
+  const qint64 file_bytes = QFileInfo(bin_path).size();
+
+  auto fmt = [](const std::string& label, const std::string& val) {
+    return label + " : " + val + "\n";
+  };
+  LOG(fmt("Plugin", std::string(data_loader->name())));
+  LOG(fmt("DLL",
+          QFileInfo(dll_path).absoluteFilePath().toLocal8Bit().constData()));
+  LOG(fmt("File", argv[2]));
+  {
+    std::ostringstream ss;
+    ss.precision(2);
+    ss << std::fixed << (file_bytes / 1024.0 / 1024.0) << " MB";
+    LOG(fmt("Size", ss.str()));
+  }
+  {
+    std::ostringstream ss;
+    ss << iterations;
+    LOG(fmt("Runs", ss.str()));
+  }
+  LOG("---------------------------------------\n");
+
+  std::vector<long long> times;
   times.reserve(iterations);
 
   for (int i = 0; i < iterations; i++)
@@ -88,37 +130,45 @@ int main(int argc, char* argv[])
 
     const bool ok = data_loader->readDataFromFile(&info, plot_data);
 
-    const qint64 elapsed_ms = timer.elapsed();
+    const long long elapsed_ms = timer.elapsed();
     times.push_back(elapsed_ms);
 
-    // Count total series loaded as a sanity check.
     const size_t total_series = plot_data.numeric.size();
 
-    qInfo() << QString("  Run %1: %2 ms  |  %3 series  |  %4")
-                   .arg(i + 1)
-                   .arg(elapsed_ms, 6)
-                   .arg(total_series, 5)
-                   .arg(ok ? "OK" : "FAILED");
+    std::ostringstream ss;
+    ss << "  Run " << (i + 1) << ": " << elapsed_ms << " ms"
+       << "  |  " << total_series << " series"
+       << "  |  " << (ok ? "OK" : "FAILED") << "\n";
+    LOG(ss.str());
 
-    // Let Qt process any pending events between runs.
     QApplication::processEvents();
   }
 
   if (iterations > 1)
   {
-    const qint64 sum = std::accumulate(times.begin(), times.end(), 0LL);
-    const qint64 min_t = *std::min_element(times.begin(), times.end());
-    const qint64 max_t = *std::max_element(times.begin(), times.end());
+    const long long sum =
+        std::accumulate(times.begin(), times.end(), 0LL);
+    const long long min_t = *std::min_element(times.begin(), times.end());
+    const long long max_t = *std::max_element(times.begin(), times.end());
     const double avg = static_cast<double>(sum) / iterations;
     const double mb_per_s = (file_bytes / 1024.0 / 1024.0) / (avg / 1000.0);
 
-    qInfo() << "---------------------------------------";
-    qInfo() << QString("  Average : %1 ms").arg(avg, 0, 'f', 1);
-    qInfo() << QString("  Min     : %1 ms").arg(min_t);
-    qInfo() << QString("  Max     : %1 ms").arg(max_t);
-    qInfo() << QString("  Throughput: %1 MB/s").arg(mb_per_s, 0, 'f', 1);
+    LOG("---------------------------------------\n");
+    {
+      std::ostringstream ss;
+      ss << std::fixed;
+      ss.precision(1);
+      ss << "  Average   : " << avg << " ms\n";
+      ss << "  Min       : " << min_t << " ms\n";
+      ss << "  Max       : " << max_t << " ms\n";
+      ss.precision(1);
+      ss << "  Throughput: " << mb_per_s << " MB/s\n";
+      LOG(ss.str());
+    }
   }
 
+  LOG("Done.\n");
+  g_log.close();
   loader.unload();
   return 0;
 }
