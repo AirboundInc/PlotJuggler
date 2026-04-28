@@ -19,9 +19,9 @@ static std::unordered_map<uint64_t, DataTamerParser::Schema> _global_data_tamer_
 
 ParserROS::ParserROS(const std::string& topic_name, const std::string& type_name,
                      const std::string& schema, RosMsgParser::Deserializer* deserializer,
-                     PlotDataMapRef& data)
+                     PlotDataMapRef& data, RosMsgParser::SchemaFormat schema_format)
   : MessageParser(topic_name, data)
-  , _parser(topic_name, type_name, schema)
+  , _parser(topic_name, type_name, schema, schema_format)
   , _deserializer(deserializer)
   , _topic(topic_name)
 {
@@ -133,16 +133,17 @@ bool ParserROS::parseMessage(const PJ::MessageRef serialized_msg, double& timest
 
   std::string series_name;
 
-  for (const auto& [key, str] : _flat_msg.name)
-  {
-    key.toStr(series_name);
-    StringSeries& data = getStringSeries(series_name);
-    data.pushBack({ timestamp, str });
-  }
-
   for (const auto& [key, value] : _flat_msg.value)
   {
     key.toStr(series_name);
+
+    if (value.getTypeID() == RosMsgParser::BuiltinType::STRING)
+    {
+      StringSeries& sdata = getStringSeries(series_name);
+      sdata.pushBack({ timestamp, value.extract<std::string>() });
+      continue;
+    }
+
     PlotData& data = getSeries(series_name);
 
     if (!_strict_truncation_check)
@@ -214,11 +215,12 @@ void ParserROS::parseHeader(const std::string& prefix, double& timestamp)
 {
   const auto header = readHeader(timestamp);
 
-  getSeries(prefix + "/header/stamp").pushBack({ timestamp, header.stamp.toSec() });
-  getStringSeries(prefix + "/header/frame_id").pushBack({ timestamp, header.frame_id });
+  getSeries(prefix + "/stamp/sec").pushBack({ timestamp, double(header.stamp.sec) });
+  getSeries(prefix + "/stamp/nanosec").pushBack({ timestamp, double(header.stamp.nanosec) });
+  getStringSeries(prefix + "/frame_id").pushBack({ timestamp, header.frame_id });
   if (dynamic_cast<ROS_Deserializer*>(_deserializer.get()) != nullptr)
   {
-    getSeries(prefix + "/header/seq").pushBack({ timestamp, double(header.seq) });
+    getSeries(prefix + "/seq").pushBack({ timestamp, double(header.seq) });
   }
 }
 
@@ -372,16 +374,24 @@ void ParserROS::parseDiagnosticMsg(const std::string& prefix, double& timestamp)
 
   for (const auto& status : msg.status)
   {
-    for (const auto& kv : status.key_value)
-    {
+    auto make_name = [&](const std::string& value_name) {
       if (status.hardware_id.empty())
       {
-        series_name = fmt::format("{}/{}/{}", prefix, status.name, kv.first);
+        return fmt::format("{}/{}/{}", prefix, status.name, value_name);
       }
       else
       {
-        series_name = fmt::format("{}/{}/{}/{}", prefix, status.hardware_id, status.name, kv.first);
+        return fmt::format("{}/{}/{}/{}", prefix, status.hardware_id, status.name, value_name);
       }
+    };
+    series_name = make_name("level");
+    getSeries(series_name).pushBack({ timestamp, static_cast<double>(status.level) });
+    series_name = make_name("message");
+    getStringSeries(series_name).pushBack({ timestamp, status.message });
+
+    for (const auto& kv : status.key_value)
+    {
+      series_name = make_name(kv.first);
 
       bool ok;
       double value = QString::fromStdString(kv.second).toDouble(&ok);
@@ -407,7 +417,7 @@ void ParserROS::parseJointStateMsg(const std::string& prefix, double& timestamp)
   msg.velocity.clear();
   msg.effort.clear();
 
-  parseHeader(prefix, timestamp);
+  parseHeader(prefix + "/header", timestamp);
 
   size_t name_size = _deserializer->deserializeUInt32();
   if (name_size > 0)

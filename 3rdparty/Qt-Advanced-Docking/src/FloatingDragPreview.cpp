@@ -8,6 +8,7 @@
 //============================================================================
 //                                   INCLUDES
 //============================================================================
+#include <AutoHideDockContainer.h>
 #include "FloatingDragPreview.h"
 #include <iostream>
 
@@ -21,6 +22,8 @@
 #include "DockManager.h"
 #include "DockContainerWidget.h"
 #include "DockOverlay.h"
+#include "AutoHideDockContainer.h"
+#include "ads_globals.h"
 
 namespace ads
 {
@@ -32,6 +35,7 @@ struct FloatingDragPreviewPrivate
 {
 	CFloatingDragPreview *_this;
 	QWidget* Content;
+	CDockWidget::DockWidgetFeatures ContentFeatures;
 	CDockAreaWidget* ContentSourceArea = nullptr;
 	QPoint DragStartMousePosition;
 	CDockManager* DockManager;
@@ -60,7 +64,7 @@ struct FloatingDragPreviewPrivate
 	void cancelDragging()
 	{
 		Canceled = true;
-		emit _this->draggingCanceled();
+		Q_EMIT _this->draggingCanceled();
 		DockManager->containerOverlay()->hideOverlay();
 		DockManager->dockAreaOverlay()->hideOverlay();
 		_this->close();
@@ -71,6 +75,42 @@ struct FloatingDragPreviewPrivate
 	 * outside of any drop area
 	 */
 	void createFloatingWidget();
+
+	/**
+	 * Returns true, if the content is floatable
+	 */
+	bool isContentFloatable() const
+	{
+		return this->ContentFeatures.testFlag(CDockWidget::DockWidgetFloatable);
+	}
+
+	/**
+	 * Returns true, if the content is pinnable
+	 */
+	bool isContentPinnable() const
+	{
+		return this->ContentFeatures.testFlag(CDockWidget::DockWidgetPinnable);
+	}
+
+	/**
+	 * Returns the content features
+	 */
+	CDockWidget::DockWidgetFeatures contentFeatures() const
+	{
+		CDockWidget* DockWidget = qobject_cast<CDockWidget*>(Content);
+		if (DockWidget)
+		{
+			return DockWidget->features();
+		}
+
+		CDockAreaWidget* DockArea = qobject_cast<CDockAreaWidget*>(Content);
+		if (DockArea)
+		{
+			return DockArea->features();
+		}
+
+		return CDockWidget::DockWidgetFeatures();
+	}
 };
 // struct LedArrayPanelPrivate
 
@@ -105,8 +145,6 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint &GlobalPos)
 	DropContainer = TopContainer;
 	auto ContainerOverlay = DockManager->containerOverlay();
 	auto DockAreaOverlay = DockManager->dockAreaOverlay();
-	auto DockDropArea = DockAreaOverlay->dropAreaUnderCursor();
-	auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
 
 	if (!TopContainer)
 	{
@@ -119,15 +157,39 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint &GlobalPos)
 		return;
 	}
 
+	auto DockDropArea = DockAreaOverlay->dropAreaUnderCursor();
+	auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
+
 	int VisibleDockAreas = TopContainer->visibleDockAreaCount();
-	ContainerOverlay->setAllowedAreas(
-	    VisibleDockAreas > 1 ? OuterDockAreas : AllDockAreas);
+
+	// Include the overlay widget we're dragging as a visible widget
+	auto dockAreaWidget = qobject_cast<CDockAreaWidget*>(Content);
+	if (dockAreaWidget && dockAreaWidget->isAutoHide())
+	{
+		VisibleDockAreas++;
+	}
+
+	DockWidgetAreas AllowedContainerAreas = (VisibleDockAreas > 1) ? OuterDockAreas : AllDockAreas;
+	//ContainerOverlay->enableDropPreview(ContainerDropArea != InvalidDockWidgetArea);
 	auto DockArea = TopContainer->dockAreaAt(GlobalPos);
+	// If the dock container contains only one single DockArea, then we need
+	// to respect the allowed areas - only the center area is relevant here because
+	// all other allowed areas are from the container
+	if (VisibleDockAreas == 1 && DockArea)
+	{
+		AllowedContainerAreas.setFlag(CenterDockWidgetArea, DockArea->allowedAreas().testFlag(CenterDockWidgetArea));
+	}
+
+	if (isContentPinnable())
+	{
+		AllowedContainerAreas |= AutoHideDockAreas;
+	}
+	ContainerOverlay->setAllowedAreas(AllowedContainerAreas);
+	ContainerOverlay->enableDropPreview(ContainerDropArea != InvalidDockWidgetArea);
 	if (DockArea && DockArea->isVisible() && VisibleDockAreas >= 0 && DockArea != ContentSourceArea)
 	{
 		DockAreaOverlay->enableDropPreview(true);
-		DockAreaOverlay->setAllowedAreas(
-		    (VisibleDockAreas == 1) ? NoDockWidgetArea : DockArea->allowedAreas());
+		DockAreaOverlay->setAllowedAreas( (VisibleDockAreas == 1) ? NoDockWidgetArea : DockArea->allowedAreas());
 		DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
 
 		// A CenterDockWidgetArea for the dockAreaOverlay() indicates that
@@ -150,15 +212,13 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint &GlobalPos)
 		DockAreaOverlay->hideOverlay();
 		// If there is only one single visible dock area in a container, then
 		// it does not make sense to show a dock overlay because the dock area
-		// would be removed and inserted at the same position
+		// would be removed and inserted at the same position. Only auto hide
+		// area is allowed
 		if (VisibleDockAreas == 1)
 		{
-			ContainerOverlay->hideOverlay();
+			ContainerOverlay->setAllowedAreas(AutoHideDockAreas);
 		}
-		else
-		{
-			ContainerOverlay->showOverlay(TopContainer);
-		}
+		ContainerOverlay->showOverlay(TopContainer);
 
 
 		if (DockArea == ContentSourceArea && InvalidDockWidgetArea == ContainerDropArea)
@@ -216,31 +276,37 @@ void FloatingDragPreviewPrivate::createFloatingWidget()
 
 
 //============================================================================
+// Wayland: in the frameless config, parent the preview to the manager's
+// top-level window so it renders as a translucent child instead of a Qt::Tool
+// top-level. Wayland refuses to honour client-driven move() of top-levels in
+// screen coordinates; child widgets work on every backend.
 CFloatingDragPreview::CFloatingDragPreview(QWidget* Content, QWidget* parent) :
-	QWidget(parent),
+	QWidget((parent && !CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
+	            ? parent->window()
+	            : parent),
 	d(new FloatingDragPreviewPrivate(this))
 {
 	d->Content = Content;
+	d->ContentFeatures = d->contentFeatures();
 	setAttribute(Qt::WA_DeleteOnClose);
 	if (CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
 	{
 		setWindowFlags(
 			Qt::Window | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint);
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+		auto Flags = windowFlags();
+		Flags |= Qt::WindowStaysOnTopHint | Qt::X11BypassWindowManagerHint;
+		setWindowFlags(Flags);
+#endif
 	}
 	else
 	{
-		setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
 		setAttribute(Qt::WA_NoSystemBackground);
 		setAttribute(Qt::WA_TranslucentBackground);
+		// Let releases over visible drop indicators fall through to them.
+		setAttribute(Qt::WA_TransparentForMouseEvents);
 	}
-
-#ifdef Q_OS_LINUX
-    auto Flags = windowFlags();
-    Flags |= Qt::WindowStaysOnTopHint | Qt::X11BypassWindowManagerHint;
-    setWindowFlags(Flags);
-#endif
-
-	setWindowOpacity(0.6);
 
 	// Create a static image of the widget that should get undocked
 	// This is like some kind preview image like it is uses in drag and drop
@@ -293,10 +359,20 @@ CFloatingDragPreview::~CFloatingDragPreview()
 //============================================================================
 void CFloatingDragPreview::moveFloating()
 {
-	int BorderSize = (frameSize().width() - size().width()) / 2;
-	const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition
+	const int BorderSize = (frameSize().width() - size().width()) / 2;
+	const QPoint TargetGlobal = QCursor::pos() - d->DragStartMousePosition
 	    - QPoint(BorderSize, 0);
-	move(moveToPos);
+	// Wayland: when we're a child widget (frameless config), translate
+	// the screen-coord target into parent-local space so move() actually
+	// places us under the cursor.
+	if (isWindow() || !parentWidget())
+	{
+		move(TargetGlobal);
+	}
+	else
+	{
+		move(parentWidget()->mapFromGlobal(TargetGlobal));
+	}
 	d->updateDropOverlays(QCursor::pos());
 }
 
@@ -311,7 +387,7 @@ void CFloatingDragPreview::startFloating(const QPoint &DragStartMousePos,
 	d->DragStartMousePosition = DragStartMousePos;
 	moveFloating();
 	show();
-
+	raise();
 }
 
 
@@ -319,28 +395,39 @@ void CFloatingDragPreview::startFloating(const QPoint &DragStartMousePos,
 void CFloatingDragPreview::finishDragging()
 {
 	ADS_PRINT("CFloatingDragPreview::finishDragging");
+
 	auto DockDropArea = d->DockManager->dockAreaOverlay()->visibleDropAreaUnderCursor();
 	auto ContainerDropArea = d->DockManager->containerOverlay()->visibleDropAreaUnderCursor();
+	bool ValidDropArea = (DockDropArea != InvalidDockWidgetArea)  || (ContainerDropArea != InvalidDockWidgetArea);
+
+	// Non floatable auto hide widgets should stay in its current auto hide
+	// state if they are dragged into a floating window
+	if (ValidDropArea || d->isContentFloatable())
+	{
+		cleanupAutoHideContainerWidget(ContainerDropArea);
+	}
+
 	if (!d->DropContainer)
 	{
 		d->createFloatingWidget();
 	}
 	else if (DockDropArea != InvalidDockWidgetArea)
 	{
-		d->DropContainer->dropWidget(d->Content, DockDropArea, d->DropContainer->dockAreaAt(QCursor::pos()));
+		d->DropContainer->dropWidget(d->Content, DockDropArea, d->DropContainer->dockAreaAt(QCursor::pos()),
+			d->DockManager->dockAreaOverlay()->tabIndexUnderCursor());
 	}
 	else if (ContainerDropArea != InvalidDockWidgetArea)
 	{
+		CDockAreaWidget* DockArea = nullptr;
 		// If there is only one single dock area, and we drop into the center
 		// then we tabify the dropped widget into the only visible dock area
 		if (d->DropContainer->visibleDockAreaCount() <= 1 && CenterDockWidgetArea == ContainerDropArea)
 		{
-			d->DropContainer->dropWidget(d->Content, ContainerDropArea, d->DropContainer->dockAreaAt(QCursor::pos()));
+			DockArea = d->DropContainer->dockAreaAt(QCursor::pos());
 		}
-		else
-		{
-			d->DropContainer->dropWidget(d->Content, ContainerDropArea, nullptr);
-		}
+
+		d->DropContainer->dropWidget(d->Content, ContainerDropArea, DockArea,
+			d->DockManager->containerOverlay()->tabIndexUnderCursor());
 	}
 	else
 	{
@@ -354,6 +441,33 @@ void CFloatingDragPreview::finishDragging()
 
 
 //============================================================================
+void CFloatingDragPreview::cleanupAutoHideContainerWidget(DockWidgetArea ContainerDropArea)
+{
+	auto DroppedDockWidget = qobject_cast<CDockWidget*>(d->Content);
+	auto DroppedArea = qobject_cast<CDockAreaWidget*>(d->Content);
+	auto AutoHideContainer = DroppedDockWidget
+		? DroppedDockWidget->autoHideDockContainer()
+		: DroppedArea->autoHideDockContainer();
+
+	if (!AutoHideContainer)
+	{
+		return;
+	}
+
+	// If the dropped widget is already an auto hide widget and if it is moved
+	// to a new side bar location in the same container, then we do not need
+	// to cleanup
+	if (ads::internal::isSideBarArea(ContainerDropArea)
+	&& (d->DropContainer == AutoHideContainer->dockContainer()))
+	{
+		return;
+	}
+
+	AutoHideContainer->cleanupAndDelete();
+}
+
+
+//============================================================================
 void CFloatingDragPreview::paintEvent(QPaintEvent* event)
 {
 	Q_UNUSED(event);
@@ -363,6 +477,7 @@ void CFloatingDragPreview::paintEvent(QPaintEvent* event)
 	}
 
 	QPainter painter(this);
+	painter.setOpacity(0.6);
 	if (CDockManager::testConfigFlag(CDockManager::DragPreviewShowsContentPixmap))
 	{
 		painter.drawPixmap(QPoint(0, 0), d->ContentPreviewPixmap);

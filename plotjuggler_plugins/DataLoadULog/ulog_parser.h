@@ -33,11 +33,11 @@ public:
     const size_t _length;
     size_t offset;
 
-    DataStream(char* data, int len) : _data(data), _length(len), offset(0)
+    DataStream(char* data, size_t len) : _data(data), _length(len), offset(0)
     {
     }
 
-    void read(char* dst, int len)
+    void read(char* dst, size_t len)
     {
       memcpy(dst, &_data[offset], len);
       offset += len;
@@ -185,5 +185,5 @@ private:
   void parseDataMessage(const Subscription& sub, char* message);
 
   char* parseSimpleDataMessage(Timeseries& timeseries, const Format* format, char* message,
-                               size_t* index);
+                               size_t* index, bool read_timestamp = true);
 };

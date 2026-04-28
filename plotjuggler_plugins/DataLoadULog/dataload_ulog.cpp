@@ -38,8 +38,15 @@ bool DataLoadULog::readDataFromFile(FileLoadInfo* fileload_info, PlotDataMapRef&
   {
     throw std::runtime_error("ULog: Failed to open file");
   }
-  QByteArray file_array = file.readAll();
-  ULogParser::DataStream datastream(file_array.data(), file_array.size());
+  const qint64 file_size = file.size();
+  uchar* mapped = file.map(0, file_size);
+  if (!mapped)
+  {
+    throw std::runtime_error(std::string("ULog: failed to memory-map file: ") +
+                             file.errorString().toStdString());
+  }
+  ULogParser::DataStream datastream(reinterpret_cast<char*>(mapped),
+                                    static_cast<size_t>(file_size));
 
   ULogParser parser(datastream);
 
@@ -49,15 +56,17 @@ bool DataLoadULog::readDataFromFile(FileLoadInfo* fileload_info, PlotDataMapRef&
   {
     const std::string& sucsctiption_name = it.first;
     const ULogParser::Timeseries& timeseries = it.second;
+    auto group = plot_data.getOrCreateGroup(sucsctiption_name);
 
     for (const auto& data : timeseries.data)
     {
       std::string series_name = sucsctiption_name + data.first;
 
-      auto series = plot_data.addNumeric(series_name);
+      auto series = plot_data.addNumeric(series_name, group);
 
       for (size_t i = 0; i < data.second.size(); i++)
       {
+        assert(i < timeseries.timestamps.size());
         const uint64_t timestamp = timeseries.timestamps[i].value_or(static_cast<uint64_t>(i));
         double msg_time = static_cast<double>(timestamp) * 0.000001;
         min_msg_time = std::min(min_msg_time, msg_time);

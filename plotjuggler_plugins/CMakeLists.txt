@@ -8,13 +8,17 @@ add_subdirectory(DataStreamWebsocket)
 add_subdirectory(DataStreamUDP)
 add_subdirectory(DataStreamMQTT)
 add_subdirectory(DataStreamZMQ)
+add_subdirectory(DataStreamFoxgloveBridge)
+add_subdirectory(DataStreamPlotJugglerBridge)
+add_subdirectory(DataStreamSerialPort)
 
-add_subdirectory(StatePublisherCSV)
 add_subdirectory(VideoViewer)
 
 add_subdirectory(ToolboxQuaternion)
 add_subdirectory(ToolboxFFT)
 add_subdirectory(ToolboxLuaEditor)
+add_subdirectory(ToolboxCSV)
+add_subdirectory(ToolboxMosaico)
 
 add_subdirectory(ParserProtobuf)
 add_subdirectory(ParserROS)

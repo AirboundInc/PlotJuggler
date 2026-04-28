@@ -17,12 +17,23 @@
 #include <QLineEdit>
 #include "PlotJuggler/svg_util.h"
 
+class HiddenTitleBar : public ads::CDockAreaTitleBar
+{
+public:
+  using ads::CDockAreaTitleBar::CDockAreaTitleBar;
+  void setVisible(bool visible) override
+  {
+    // Always keep hidden — PlotJuggler uses its own DockToolbar
+    QWidget::setVisible(false);
+  }
+};
+
 class SplittableComponentsFactory : public ads::CDockComponentsFactory
 {
 public:
   ads::CDockAreaTitleBar* createDockAreaTitleBar(ads::CDockAreaWidget* dock_area) const override
   {
-    auto title_bar = new ads::CDockAreaTitleBar(dock_area);
+    auto title_bar = new HiddenTitleBar(dock_area);
     title_bar->setVisible(false);
     return title_bar;
   }
@@ -31,7 +42,8 @@ public:
 PlotDocker::PlotDocker(QString name, PlotDataMapRef& datamap, QWidget* parent)
   : ads::CDockManager(parent), _name(name), _datamap(datamap)
 {
-  ads::CDockComponentsFactory::setFactory(new SplittableComponentsFactory());
+  setStyleSheet("");  // Disable ADS internal stylesheet; PlotJuggler uses its own
+  setComponentsFactory(new SplittableComponentsFactory());
 
   auto CreateFirstWidget = [&]() {
     if (dockAreaCount() == 0)
@@ -130,7 +142,8 @@ QDomElement PlotDocker::xmlSaveState(QDomDocument& doc) const
   for (CDockContainerWidget* container : dockContainers())
   {
     QDomElement elem = doc.createElement("Container");
-    auto child = saveChildNodesState(doc, container->rootSplitter());
+    auto child = saveChildNodesState(
+        doc, container->findChild<QSplitter*>(QString(), Qt::FindDirectChildrenOnly));
     elem.appendChild(child);
     containers_elem.appendChild(elem);
   }
@@ -348,9 +361,9 @@ DockWidget::DockWidget(PlotDataMapRef& datamap, QWidget* parent)
   connect(_plot_widget, &PlotWidget::splitVertical, this, &DockWidget::splitVertical);
 
   connect(_toolbar, &DockToolbar::titleChanged, _plot_widget,
-          [=](QString title) { _plot_widget->setStatisticsTitle(title); });
+          [this](QString title) { _plot_widget->setStatisticsTitle(title); });
 
-  auto FullscreenAction = [=]() {
+  auto FullscreenAction = [this]() {
     PlotDocker* parent_docker = static_cast<PlotDocker*>(dockManager());
 
     this->toolBar()->toggleFullscreen();
@@ -369,7 +382,7 @@ DockWidget::DockWidget(PlotDataMapRef& datamap, QWidget* parent)
 
   QObject::connect(_toolbar->buttonFullscreen(), &QPushButton::clicked, FullscreenAction);
 
-  QObject::connect(_toolbar->buttonClose(), &QPushButton::pressed, [=]() {
+  QObject::connect(_toolbar->buttonClose(), &QPushButton::pressed, [this]() {
     dockAreaWidget()->closeArea();
     takeWidget();
     _plot_widget->deleteLater();

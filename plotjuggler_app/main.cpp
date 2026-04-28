@@ -23,6 +23,7 @@
 #include <QHostInfo>
 #include <QSslConfiguration>
 #include <QSslSocket>
+#include <QStyleFactory>
 
 #include "PlotJuggler/transform_function.h"
 #include "transforms/binary_filter.h"
@@ -41,7 +42,35 @@
 #include <ros/ros.h>
 #endif
 #ifdef COMPILED_WITH_AMENT
-#include <rclcpp/rclcpp.hpp>
+#include <string_view>
+
+// Strip ROS 2 CLI arguments ("--ros-args ... [--]") from argv.
+// Equivalent to rclcpp::remove_ros_arguments, but without pulling the rclcpp /
+// rosidl typesupport stack into PlotJuggler just for one call.
+static std::vector<std::string> RemoveRos2Arguments(int argc, char* argv[])
+{
+  std::vector<std::string> out;
+  out.reserve(argc);
+  bool in_ros_block = false;
+  for (int i = 0; i < argc; ++i)
+  {
+    const std::string_view tok(argv[i]);
+    if (!in_ros_block)
+    {
+      if (tok == "--ros-args")
+      {
+        in_ros_block = true;
+        continue;
+      }
+      out.emplace_back(argv[i]);
+    }
+    else if (tok == "--")
+    {
+      in_ros_block = false;
+    }
+  }
+  return out;
+}
 #endif
 
 static QString VERSION_STRING =
@@ -66,7 +95,7 @@ QPixmap getFunnySplashscreen()
   srand(time(nullptr));
 
   auto getNum = []() {
-    const int last_image_num = 103;
+    const int last_image_num = 105;
     return rand() % (last_image_num);
   };
 
@@ -152,7 +181,7 @@ int main(int argc, char* argv[])
 #elif defined(COMPILED_WITH_CATKIN)
   ros::removeROSArgs(argc, argv, args);
 #elif defined(COMPILED_WITH_AMENT)
-  args = rclcpp::remove_ros_arguments(argc, argv);
+  args = RemoveRos2Arguments(argc, argv);
 #endif
 
   args = MergeArguments(args);
@@ -164,7 +193,23 @@ int main(int argc, char* argv[])
     new_argv.push_back(args[i].data());
   }
 
+  // Must be set before QApplication is constructed. Tells Qt to scale
+  // widget metrics and QSS pixel values by the screen's scale factor,
+  // so XWayland (which reports DPI=N*96 with dpr=1) renders identically
+  // to native Wayland (DPI=96 dpr=N). Without this, Fusion metrics
+  // auto-scale by DPI but QSS hardcoded `px` values don't, causing
+  // inconsistent widget sizing in the AppImage.
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+
   QApplication app(new_argc, new_argv.data());
+
+  // Pin the Qt base style so the app's QSS paints on top of a known
+  // palette. Without this, the AppImage inherits the host's Qt platform
+  // theme (e.g. GTK3 dark on Ubuntu), causing unstyled widgets like the
+  // menu bar to render with system-dark colors while QSS-covered widgets
+  // stay light — the mixed-theme look users report.
+  QApplication::setStyle(QStyleFactory::create("Fusion"));
 
   //-------------------------
 
@@ -272,6 +317,10 @@ int main(int argc, char* argv[])
   QCommandLineOption window_title(QStringList() << "window_title", "Set the window title",
                                   "window_title");
   parser.addOption(window_title);
+
+  QCommandLineOption auto_prefix_option("auto-prefix",
+                                        "Automatically prefix each data file with its filename");
+  parser.addOption(auto_prefix_option);
 
   parser.process(*qApp);
 
@@ -413,7 +462,7 @@ int main(int argc, char* argv[])
 
   QNetworkRequest request_new_release;
   request_new_release.setUrl(
-      QUrl("https://api.github.com/repos/facontidavide/PlotJuggler/releases/latest"));
+      QUrl("https://api.github.com/repos/PlotJuggler/PlotJuggler/releases/latest"));
 
   // Disable SSL peer verification for GitHub API (workaround for Qt5/OpenSSL 3.0 incompatibility)
   QSslConfiguration sslConfig_release = request_new_release.sslConfiguration();

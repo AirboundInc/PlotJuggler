@@ -28,12 +28,12 @@ PlotJuggler is a Qt-based desktop application for visualizing time series data. 
 
 ```bash
 # Install dependencies
-sudo apt -y install qtbase5-dev libqt5svg5-dev libqt5websockets5-dev \
+sudo apt -y install qtbase5-dev libqt5svg5-dev libqt5websockets5-dev libqt5serialport5-dev \
       libqt5opengl5-dev libqt5x11extras5-dev libprotoc-dev libzmq3-dev \
       liblz4-dev libzstd-dev
 
 # Clone repository
-git clone https://github.com/facontidavide/PlotJuggler.git ~/plotjuggler_ws/src/PlotJuggler
+git clone https://github.com/PlotJuggler/PlotJuggler.git ~/plotjuggler_ws/src/PlotJuggler
 cd ~/plotjuggler_ws
 
 # Build with CMake
@@ -222,7 +222,7 @@ Located in `.github/workflows/`:
 
 - **Documentation**: `README.md`, `COMPILE.md`
 - **License**: Mozilla Public License Version 2.0 (MPL-2.0)
-- **Main Repository**: https://github.com/facontidavide/PlotJuggler
+- **Main Repository**: https://github.com/PlotJuggler/PlotJuggler
 - **Issue Tracker**: GitHub Issues
 - **Tutorials**: https://slides.com/davidefaconti/
 - **Changelog**: `CHANGELOG.rst`

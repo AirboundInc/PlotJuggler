@@ -59,7 +59,7 @@ class TimeScaleDraw : public QwtScaleDraw
 {
   virtual QwtText label(double v) const
   {
-    QDateTime dt = QDateTime::fromMSecsSinceEpoch((qint64)(v * 1000));
+    QDateTime dt = QDateTime::fromMSecsSinceEpoch((qint64)(v * 1000), Qt::UTC);
     if (dt.date().year() == 1970 && dt.date().month() == 1 && dt.date().day() == 1)
     {
       return dt.toString("hh:mm:ss.z");
@@ -150,14 +150,14 @@ void PlotWidget::buildActions()
   QIcon iconDeleteList;
 
   _action_edit = new QAction("&Edit curves...", this);
-  connect(_action_edit, &QAction::triggered, this, [=]() {
+  connect(_action_edit, &QAction::triggered, this, [this]() {
     auto editor_dialog = new PlotwidgetEditor(this, qwtPlot());
     editor_dialog->exec();
     editor_dialog->deleteLater();
   });
 
   _action_formula = new QAction("&Apply filter to data...", this);
-  connect(_action_formula, &QAction::triggered, this, [=]() {
+  connect(_action_formula, &QAction::triggered, this, [this]() {
     auto editor_dialog = new DialogTransformEditor(this);
     int res = editor_dialog->exec();
     editor_dialog->deleteLater();
@@ -929,8 +929,12 @@ bool PlotWidget::xmlLoadState(QDomElement& plot_widget, bool autozoom)
     {
       overrideCurvesStyle(PlotWidgetBase::STEPSINV);
     }
-    updateCurvesStyle();
   }
+  else
+  {
+    overrideCurvesStyle(std::nullopt);
+  }
+  updateCurvesStyle();
 
   QString bg_data = plot_widget.attribute("background_data");
   QString bg_colormap = plot_widget.attribute("background_colormap");

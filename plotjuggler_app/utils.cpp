@@ -13,13 +13,16 @@ namespace PJ
 template <typename Value>
 void MergeData(TimeseriesBase<Value>& src_plot, TimeseriesBase<Value>& dst_plot)
 {
+  static_assert(!std::is_same_v<Value, StringDictIndex>,
+                "Use the MergeData(StringSeries&, StringSeries&) overload for StringSeries");
+
   if (src_plot.size() == 0)
   {
     return;
   }
   if (dst_plot.size() == 0)
   {
-    std::swap(dst_plot, src_plot);
+    dst_plot.swapData(src_plot);
     return;
   }
 
@@ -64,8 +67,8 @@ void MergeData(TimeseriesBase<Value>& src_plot, TimeseriesBase<Value>& dst_plot)
   // prepend
   if (src_plot.back().x < dst_plot.front().x)
   {
-    // swap and append
-    std::swap(dst_plot, src_plot);
+    // swap data only (preserves name/group/attributes) and append
+    dst_plot.swapData(src_plot);
     for (size_t i = 0; i < src_plot.size(); i++)
     {
       dst_plot.pushBack(std::move(src_plot.at(i)));
@@ -86,12 +89,32 @@ void MergeData(PlotDataXY& src_plot, PlotDataXY& dst_plot)
 {
   if (dst_plot.size() == 0)
   {
-    std::swap(dst_plot, src_plot);
+    dst_plot.swapData(src_plot);
     return;
   }
   for (const auto& p : src_plot)
   {
     dst_plot.pushBack(p);
+  }
+  src_plot.clear();
+}
+
+void MergeData(StringSeries& src_plot, StringSeries& dst_plot)
+{
+  if (src_plot.size() == 0)
+  {
+    return;
+  }
+  if (dst_plot.size() == 0)
+  {
+    dst_plot.swapData(src_plot);
+    return;
+  }
+  for (size_t i = 0; i < src_plot.size(); i++)
+  {
+    auto& pt = src_plot.at(i);
+    auto str = src_plot.getString(pt.y);
+    dst_plot.pushBack({ pt.x, str });
   }
   src_plot.clear();
 }

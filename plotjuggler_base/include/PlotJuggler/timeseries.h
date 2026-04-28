@@ -49,6 +49,12 @@ public:
     return _max_range_x;
   }
 
+  void swapData(TimeseriesBase& other)
+  {
+    PlotDataBase<double, Value>::swapData(other);
+    std::swap(_max_range_x, other._max_range_x);
+  }
+
   int getIndexFromX(double x) const;
 
   std::optional<Value> getYfromX(double x) const
@@ -80,7 +86,7 @@ public:
     trimRange();
   }
 
-  void pushUnsorted(const Point& p)
+  virtual void pushUnsorted(const Point& p)
   {
     if constexpr (std::is_arithmetic_v<Value>)
     {
