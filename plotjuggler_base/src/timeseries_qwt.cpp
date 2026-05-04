@@ -5,9 +5,12 @@
  */
 
 #include "timeseries_qwt.h"
+#include "qwt_scale_map.h"
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QString>
 
@@ -33,6 +36,28 @@ RangeOpt QwtSeriesWrapper::getVisualizationRangeY(Range range_x)
 
 RangeOpt QwtTimeseries::getVisualizationRangeY(Range range_X)
 {
+  if (_ts_data->size() == 0)
+  {
+    return {};
+  }
+
+  // Data X bounds in display coordinates (after time offset)
+  const double data_x_min = _ts_data->front().x - _time_offset;
+  const double data_x_max = _ts_data->back().x - _time_offset;
+
+  // All data is to the left of the visible range: hold the last value forward
+  // so the curve still contributes to Y auto-scaling.
+  if (data_x_max < range_X.min)
+  {
+    const double y = _ts_data->back().y;
+    return Range{ y, y };
+  }
+  // All data is to the right of the visible range: nothing to hold yet.
+  if (data_x_min > range_X.max)
+  {
+    return {};
+  }
+
   int first_index = _ts_data->getIndexFromX(range_X.min + _time_offset);
   int last_index = _ts_data->getIndexFromX(range_X.max + _time_offset);
 
@@ -224,4 +249,104 @@ RangeOpt QwtTimeseries::getVisualizationRangeX()
 const PlotDataBase<double, double>* QwtSeriesWrapper::plotData() const
 {
   return _data;
+}
+
+//---------------------------------------------------------
+
+void PJPlotCurve::drawSeries(QPainter* painter, const QwtScaleMap& xMap,
+                             const QwtScaleMap& yMap, const QRectF& canvasRect,
+                             int from, int to) const
+{
+  // Default rendering of the actual samples (does nothing if all samples
+  // happen to fall outside the visible canvas).
+  QwtPlotCurve::drawSeries(painter, xMap, yMap, canvasRect, from, to);
+
+  const auto* series = data();
+  const auto* ts = dynamic_cast<const QwtTimeseries*>(series);
+  if (!ts)
+  {
+    return;  // Not a time series (e.g. XY plot): no sample-and-hold extension.
+  }
+  const int n = static_cast<int>(ts->size());
+  if (n == 0)
+  {
+    return;
+  }
+
+  // Only line-based styles get extended. Dots and Sticks render per-sample
+  // markers, where extending makes no visual sense.
+  const auto cs = style();
+  if (cs != Lines && cs != LinesAndDots && cs != Steps)
+  {
+    return;
+  }
+
+  // Visible X range expressed in data coordinates.
+  double x_left = xMap.invTransform(canvasRect.left());
+  double x_right = xMap.invTransform(canvasRect.right());
+  if (x_left > x_right)
+  {
+    std::swap(x_left, x_right);
+  }
+
+  const QPointF first = ts->sample(0);
+  const QPointF last = ts->sample(n - 1);
+
+  painter->save();
+  painter->setPen(pen());
+  painter->setRenderHint(QPainter::Antialiasing,
+                         testRenderHint(QwtPlotItem::RenderAntialiased));
+
+  if (last.x() <= x_left)
+  {
+    // All samples are before the visible range — hold the last value across
+    // the entire canvas so the user still sees the held line.
+    const double y_pix = yMap.transform(last.y());
+    painter->drawLine(QPointF(canvasRect.left(), y_pix),
+                      QPointF(canvasRect.right(), y_pix));
+  }
+  else if (first.x() < x_right)
+  {
+    // Right extension: hold the last sample's value forward to the canvas
+    // right edge whenever the data ends before the visible window does.
+    if (last.x() < x_right)
+    {
+      const double x0_pix = xMap.transform(last.x());
+      const double y_pix = yMap.transform(last.y());
+      painter->drawLine(QPointF(x0_pix, y_pix),
+                        QPointF(canvasRect.right(), y_pix));
+    }
+    // Left extension: if there's a sample at or before the canvas left edge,
+    // hold its value into the visible window up to the next sample.
+    if (first.x() < x_left)
+    {
+      int lo = 0;
+      int hi = n - 1;
+      while (lo < hi)
+      {
+        const int mid = (lo + hi + 1) / 2;
+        if (ts->sample(mid).x() <= x_left)
+        {
+          lo = mid;
+        }
+        else
+        {
+          hi = mid - 1;
+        }
+      }
+      const QPointF held = ts->sample(lo);
+      double x_end_pix = canvasRect.right();
+      if (lo + 1 < n)
+      {
+        x_end_pix = std::min<double>(canvasRect.right(),
+                                     xMap.transform(ts->sample(lo + 1).x()));
+      }
+      const double y_pix = yMap.transform(held.y());
+      painter->drawLine(QPointF(canvasRect.left(), y_pix),
+                        QPointF(x_end_pix, y_pix));
+    }
+  }
+  // else: data is entirely after the visible range — no held value yet.
+
+  painter->restore();
 }

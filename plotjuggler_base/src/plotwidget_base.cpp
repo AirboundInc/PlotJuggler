@@ -31,6 +31,7 @@
 #include "qwt_text.h"
 
 #include <array>
+#include <cmath>
 #include <QBoxLayout>
 #include <QMessageBox>
 #include <QSettings>
@@ -270,6 +271,13 @@ Range PlotWidgetBase::getVisualizationRangeY(Range range_X) const
     bottom = -1.0;
     top = 1.0;
   }
+  else if (top == bottom)
+  {
+    // Constant-value series: expand by an absolute amount so the line is visible
+    double half = (std::abs(top) > 1.0) ? std::abs(top) * 0.05 : 0.1;
+    bottom -= half;
+    top += half;
+  }
 
   double margin = (top - bottom) * 0.025;
 
@@ -390,7 +398,7 @@ PlotWidgetBase::CurveInfo* PlotWidgetBase::addCurve(const std::string& name, Plo
     return nullptr;  // TODO FIXME
   }
 
-  auto curve = new QwtPlotCurve(qname);
+  auto curve = new PJPlotCurve(qname);
   try
   {
     QwtSeriesWrapper* plot_qwt = nullptr;

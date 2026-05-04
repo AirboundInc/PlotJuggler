@@ -348,7 +348,7 @@ PlotWidget::CurveInfo* PlotWidget::addCurveXY(std::string name_x, std::string na
   }
 
   const auto qname = QString::fromStdString(name);
-  auto curve = new QwtPlotCurve(qname);
+  auto curve = new PJPlotCurve(qname);
 
   try
   {

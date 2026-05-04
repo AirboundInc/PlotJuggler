@@ -8,6 +8,7 @@
 #define TIMESERIES_QWT_H
 
 #include "qwt_series_data.h"
+#include "qwt_plot_curve.h"
 #include "PlotJuggler/plotdata.h"
 #include "PlotJuggler/transform_function.h"
 
@@ -97,5 +98,17 @@ protected:
 };
 
 //---------------------------------------------------------
+
+// QwtPlotCurve subclass that extends line-based curves with sample-and-hold
+// segments outside the data range, so a constant or sparsely-sampled time
+// series remains visible across the entire visible chart range.
+class PJPlotCurve : public QwtPlotCurve
+{
+public:
+  using QwtPlotCurve::QwtPlotCurve;
+
+  void drawSeries(QPainter* painter, const QwtScaleMap& xMap, const QwtScaleMap& yMap,
+                  const QRectF& canvasRect, int from, int to) const override;
+};
 
 #endif  // PLOTDATA_H
