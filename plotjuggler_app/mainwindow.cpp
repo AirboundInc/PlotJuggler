@@ -1640,6 +1640,22 @@ std::unordered_set<std::string> MainWindow::loadDataFromFile(const FileLoadInfo&
     {
       it->second.clear();
     }
+    // Re-run the snippet's global_vars so per-log state (e.g. an offset
+    // captured from the first sample) is recomputed for the new dataset.
+    // CustomFunction::reset() is a no-op because doing this during streaming
+    // crashed; on file load there is no streaming thread, so it is safe.
+    if (auto custom_func = std::dynamic_pointer_cast<CustomFunction>(custom_it.second))
+    {
+      try
+      {
+        custom_func->initEngine();
+      }
+      catch (const std::runtime_error& err)
+      {
+        qWarning("Failed to re-initialize custom series '%s': %s",
+                 custom_it.first.c_str(), err.what());
+      }
+    }
     custom_it.second->reset();
   }
   forEachWidget([](PlotWidget* plot) { plot->updateCurves(true); });
