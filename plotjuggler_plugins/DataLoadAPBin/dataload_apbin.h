@@ -54,9 +54,10 @@ private:
 
   // messages_map is a nested map which contains all messages
   //  - key1:   message name
-  //  - key2:   instance number
+  //  - key2:   instance identifier (numeric value stringified, or full decoded
+  //            string for N/n/Z-typed instance fields like SCR.Name)
   //  - value:  message_data
-  std::map<std::string, std::map<int8_t, message_data>> messages_map;
+  std::map<std::string, std::map<std::string, message_data>> messages_map;
 
 
   // multipliers and units from MULT and UNIT messages
@@ -107,8 +108,9 @@ private:
   uint32_t get_field_byte_offset(const uint8_t& msg_id, const uint8_t& field_idx);
   uint32_t get_field_byte_offset(const uint8_t& msg_id, const std::string& field_name);
 
-  // get the instance number from a message
-  uint8_t get_instance(const struct log_Format& fmt, const uint8_t* msg);
+  // get the instance identifier from a message, decoded according to the
+  // FMT type of the field flagged with '#' in FMTU.units
+  std::string get_instance(const struct log_Format& fmt, const uint8_t* msg);
 
   // get unit string for a field
   std::string get_unit(const std::string& msg_name, const std::string& field_name);

@@ -648,7 +648,7 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
           continue;
         }
 
-        const std::string instance_name = "#" + std::to_string(inst_it.first);
+        const std::string instance_name = "#" + inst_it.first;
         const std::string& field_name = field.first;
 
         std::string series_name;
@@ -747,7 +747,7 @@ void DataLoadAPBIN::handle_message_received(const struct log_Format& fmt, const 
   const std::string& msg_name = msg_id2name[msg_id];
   
   // instances
-  int8_t instance = 0;
+  std::string instance;
   if ( has_instance[msg_id] )
   {
     instance = get_instance(fmt, msg);
@@ -950,21 +950,60 @@ uint32_t DataLoadAPBIN::get_field_byte_offset(const uint8_t& msg_id, const std::
 
 
 
-uint8_t DataLoadAPBIN::get_instance(const struct log_Format& fmt, const uint8_t* msg)
+std::string DataLoadAPBIN::get_instance(const struct log_Format& fmt, const uint8_t* msg)
 {
-  // Read sensor instance from raw message byte sequence
+  // Decode the instance identifier from the raw message bytes according to
+  // the FMT type of the field flagged with '#' in FMTU.units. For string
+  // fields (N=char[16], n=char[4], Z=char[64]) the full null-terminated
+  // string is used — otherwise the script Name byte for SCR would collapse
+  // every script sharing a first character into the same instance bucket.
 
-  // get message id from FMT
   const uint8_t& msg_id = fmt.type;
-  
-  // get instance byte offset
-  const uint32_t& inst_offset = instance_offset[msg_id];
+  const uint32_t inst_offset = instance_offset[msg_id];
+  const int inst_idx = instance_idx[msg_id];
+  const char inst_fmt = fmt.format[inst_idx];
 
-  // get instance
-  uint8_t instance{ 0 };
-  memcpy(&instance, &msg[inst_offset], sizeof(uint8_t));
-
-  return instance;
+  switch (inst_fmt)
+  {
+    case 'N':  // char[16]
+    {
+      char buf[17] = {0};
+      memcpy(buf, &msg[inst_offset], 16);
+      return std::string(buf);
+    }
+    case 'n':  // char[4]
+    {
+      char buf[5] = {0};
+      memcpy(buf, &msg[inst_offset], 4);
+      return std::string(buf);
+    }
+    case 'Z':  // char[64]
+    {
+      char buf[65] = {0};
+      memcpy(buf, &msg[inst_offset], 64);
+      return std::string(buf);
+    }
+    case 'b': return std::to_string(*reinterpret_cast<const int8_t*>(&msg[inst_offset]));
+    case 'B': return std::to_string(*reinterpret_cast<const uint8_t*>(&msg[inst_offset]));
+    case 'h': return std::to_string(*reinterpret_cast<const int16_t*>(&msg[inst_offset]));
+    case 'H': return std::to_string(*reinterpret_cast<const uint16_t*>(&msg[inst_offset]));
+    case 'i': return std::to_string(*reinterpret_cast<const int32_t*>(&msg[inst_offset]));
+    case 'I': return std::to_string(*reinterpret_cast<const uint32_t*>(&msg[inst_offset]));
+    case 'f': return std::to_string(*reinterpret_cast<const float*>(&msg[inst_offset]));
+    case 'd': return std::to_string(*reinterpret_cast<const double*>(&msg[inst_offset]));
+    case 'c': return std::to_string(*reinterpret_cast<const int16_t*>(&msg[inst_offset]));
+    case 'C': return std::to_string(*reinterpret_cast<const uint16_t*>(&msg[inst_offset]));
+    case 'e': return std::to_string(*reinterpret_cast<const int32_t*>(&msg[inst_offset]));
+    case 'E': return std::to_string(*reinterpret_cast<const uint32_t*>(&msg[inst_offset]));
+    case 'L': return std::to_string(*reinterpret_cast<const int32_t*>(&msg[inst_offset]));
+    case 'M': return std::to_string(*reinterpret_cast<const uint8_t*>(&msg[inst_offset]));
+    case 'q': return std::to_string(*reinterpret_cast<const int64_t*>(&msg[inst_offset]));
+    case 'Q': return std::to_string(*reinterpret_cast<const uint64_t*>(&msg[inst_offset]));
+    default:
+      // Unknown type at the '#' position: fall back to a single-byte read so
+      // we preserve previous behavior rather than crashing on a malformed log.
+      return std::to_string(static_cast<int>(msg[inst_offset]));
+  }
 }
 
 
@@ -1072,7 +1111,12 @@ void DataLoadAPBIN::apply_timesync(void)
 
   // take the first instance as reference
   // todo: change that?
-  const message_data& gps_msg_data = messages_map["GPS"][0];
+  if ( msg_it->second.empty() )
+  {
+    std::printf("Skipping timesync because GPS message has no instances\n");
+    return;
+  }
+  const message_data& gps_msg_data = msg_it->second.begin()->second;
 
   // counter
   int idx;
