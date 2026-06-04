@@ -2,7 +2,7 @@
 <Package>
     <DisplayName>PlotJuggler Main App</DisplayName>
     <Description>Install PlotJuggler with basic plugins.</Description>
-    <Version>3.17.1.4</Version>
+    <Version>3.17.2.4</Version>
     <ReleaseDate>2026-05-11</ReleaseDate>
     <Licenses>
         <License name="MPL-2.0" file="license_mpl.txt" />
