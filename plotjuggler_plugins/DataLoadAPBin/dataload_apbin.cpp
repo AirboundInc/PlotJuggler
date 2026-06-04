@@ -138,6 +138,14 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
     std::chrono::duration<double, std::milli> publish_ms{ 0 };
   #endif
 
+  // ArduPilot logs emit FMTU after the first few data messages of each type,
+  // so without deferral handle_message_received would see has_instance=false
+  // for those early messages and bucket them under an empty instance key —
+  // producing a phantom "#" series next to the real "#0"/"#1"/... at publish
+  // time. Pre-FMTU messages are stashed (as pointers into the in-memory file
+  // buffer) and replayed once their FMTU arrives.
+  std::array<std::vector<const uint8_t*>, MAX_FORMATS> deferred_messages;
+
   while (true)
   {
     // update the progression dialog box
@@ -327,8 +335,21 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
           instance_idx[msg_id] = pos;
           instance_offset[msg_id] = get_field_byte_offset(msg_id, pos);
         }
-      } 
-        
+      }
+
+      // Replay any data messages that were stashed before this FMTU arrived,
+      // now that has_instance is correctly set for this msg_id.
+      auto& deferred = deferred_messages[msg_id];
+      if ( !deferred.empty() )
+      {
+        const struct log_Format& fmt_for_id = formats[msg_id];
+        for (const uint8_t* msg_ptr : deferred)
+        {
+          handle_message_received(fmt_for_id, msg_ptr);
+        }
+        deferred.clear();
+      }
+
       total_bytes_used += fmt.length;
       msgs_read++;
 
@@ -474,7 +495,16 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       auto other_start = std::chrono::high_resolution_clock::now();
     #endif
 
-    handle_message_received(fmt, &buf[total_bytes_used]);
+    if ( !has_fmtu[type] )
+    {
+      // FMTU hasn't arrived yet for this message type — stash the raw bytes
+      // and replay once FMTU lands (or at end-of-file if it never does).
+      deferred_messages[type].push_back(&buf[total_bytes_used]);
+    }
+    else
+    {
+      handle_message_received(fmt, &buf[total_bytes_used]);
+    }
 
     total_bytes_used += fmt.length;
     msgs_read++; // todo: this is incorrect, if message is read incomplete
@@ -483,6 +513,21 @@ bool DataLoadAPBIN::readDataFromFile(FileLoadInfo* info, PlotDataMapRef& plot_da
       auto other_end = std::chrono::high_resolution_clock::now();
       other_ms += (other_end - other_start);
     #endif
+  }
+
+
+  // Drain any messages whose FMTU never arrived. They keep instance=""
+  // (publish loop skips the suffix because has_instance is false for them).
+  for (uint16_t id = 0; id < MAX_FORMATS; ++id)
+  {
+    auto& deferred = deferred_messages[id];
+    if (deferred.empty()) continue;
+    const struct log_Format& fmt_for_id = formats[id];
+    for (const uint8_t* msg_ptr : deferred)
+    {
+      handle_message_received(fmt_for_id, msg_ptr);
+    }
+    deferred.clear();
   }
 
 
