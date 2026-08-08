@@ -278,6 +278,8 @@ MainWindow::MainWindow(const QCommandLineParser& commandline_parser, QWidget* pa
   connect(ui->timeSlider, &RealSlider::realValueChanged, this,
           &MainWindow::onTimeSlider_valueChanged);
 
+  ui->timeSlider->setWheelStepProvider([this]() { return timeSliderWheelStep(); });
+
   connect(ui->playbackRate, &QDoubleSpinBox::editingFinished, this,
           [this]() { ui->playbackRate->clearFocus(); });
 
@@ -348,7 +350,6 @@ MainWindow::MainWindow(const QCommandLineParser& commandline_parser, QWidget* pa
     buildDummyData();
   }
 
-  bool file_loaded = false;
   if (commandline_parser.isSet("datafile"))
   {
     QStringList datafiles = commandline_parser.values("datafile");
@@ -377,11 +378,11 @@ MainWindow::MainWindow(const QCommandLineParser& commandline_parser, QWidget* pa
     }
 
     const bool auto_prefix = commandline_parser.isSet("auto-prefix");
-    file_loaded = loadDataFromFiles(expanded, auto_prefix);
+    loadDataFromFiles(expanded, auto_prefix);
   }
   if (commandline_parser.isSet("layout"))
   {
-    loadLayoutFromFile(commandline_parser.value("layout"), !file_loaded);
+    loadLayoutFromFile(commandline_parser.value("layout"));
   }
 
   restoreGeometry(settings.value("MainWindow.geometry").toByteArray());
@@ -2138,7 +2139,7 @@ std::tuple<double, double, int> MainWindow::calculateVisibleRangeX()
   return std::tuple<double, double, int>(min_time, max_time, max_steps);
 }
 
-bool MainWindow::loadLayoutFromFile(QString filename, bool load_datafiles)
+bool MainWindow::loadLayoutFromFile(QString filename)
 {
   QSettings settings;
 
@@ -2174,33 +2175,9 @@ bool MainWindow::loadLayoutFromFile(QString filename, bool load_datafiles)
 
   loadPluginState(root);
   //-------------------------------------------------
-  if (load_datafiles)
-  {
-    QDomElement previously_loaded_datafile = root.firstChildElement("previouslyLoaded_"
-                                                                    "Datafiles");
-
-    QDomElement datafile_elem = previously_loaded_datafile.firstChildElement("fileInfo");
-    while (!datafile_elem.isNull())
-    {
-      QString datafile_path = datafile_elem.attribute("filename");
-      if (QDir(datafile_path).isRelative())
-      {
-        QDir layout_directory = QFileInfo(filename).absoluteDir();
-        QString new_path = layout_directory.filePath(datafile_path);
-        datafile_path = QFileInfo(new_path).absoluteFilePath();
-      }
-
-      FileLoadInfo info;
-      info.filename = datafile_path;
-      info.prefix = datafile_elem.attribute("prefix");
-
-      auto plugin_elem = datafile_elem.firstChildElement("plugin");
-      info.plugin_config.appendChild(info.plugin_config.importNode(plugin_elem, true));
-
-      loadDataFromFile(info, false);
-      datafile_elem = datafile_elem.nextSiblingElement("fileInfo");
-    }
-  }
+  // NOTE: layouts intentionally do NOT restore the datafiles that were loaded when they
+  // were saved. A layout is meant to be portable and shareable; reopening someone else's
+  // logs (or your own, from a stale absolute path) is surprising and unwanted.
 
   QDomElement previous_streamer = root.firstChildElement("previouslyLoaded_Streamer");
   if (!previous_streamer.isNull())
@@ -2560,6 +2537,33 @@ void MainWindow::updateTimeSlider()
 
   _tracker_time = std::max(_tracker_time, ui->timeSlider->getMinimum());
   _tracker_time = std::min(_tracker_time, ui->timeSlider->getMaximum());
+}
+
+double MainWindow::timeSliderWheelStep()
+{
+  // Use the narrowest X range among the visible plots: it is the one for which a coarse
+  // step would be most disruptive.
+  double narrowest_span = std::numeric_limits<double>::max();
+
+  forEachWidget([&](PlotWidget* plot) {
+    if (plot->isEmpty() || plot->isXYPlot())
+    {
+      return;
+    }
+    const double span = plot->currentBoundingRect().width();
+    if (span > 0)
+    {
+      narrowest_span = std::min(narrowest_span, span);
+    }
+  });
+
+  if (narrowest_span == std::numeric_limits<double>::max())
+  {
+    narrowest_span = ui->timeSlider->getMaximum() - ui->timeSlider->getMinimum();
+  }
+
+  // one wheel notch moves the tracker by 1% of the visible range
+  return narrowest_span / 100.0;
 }
 
 void MainWindow::updateTimeOffset()
@@ -3304,10 +3308,8 @@ void MainWindow::on_buttonSaveLayout_clicked()
   QFrame* separator = new QFrame;
   separator->setFrameStyle(QFrame::HLine | QFrame::Plain);
 
-  auto checkbox_datasource = new QCheckBox("Save data source");
-  checkbox_datasource->setToolTip("the layout will remember the source of your data,\n"
-                                  "i.e. the Datafile used or the Streaming Plugin loaded "
-                                  "?");
+  auto checkbox_datasource = new QCheckBox("Save streaming source");
+  checkbox_datasource->setToolTip("The layout will remember the Streaming Plugin in use.");
   checkbox_datasource->setFocusPolicy(Qt::NoFocus);
   checkbox_datasource->setChecked(settings.value("MainWindow.saveLayoutDataSource", true).toBool());
 
@@ -3359,30 +3361,14 @@ void MainWindow::on_buttonSaveLayout_clicked()
 
   root.appendChild(doc.createComment(" - - - - - - - - - - - - - - "));
 
-  if (checkbox_datasource->isChecked())
+  // NOTE: the datafiles of this session are deliberately not stored in the layout, so that
+  // it stays portable and can be shared. Only the streaming source is remembered.
+  if (checkbox_datasource->isChecked() && _active_streamer_plugin)
   {
-    QDomElement loaded_list = doc.createElement("previouslyLoaded_Datafiles");
-
-    for (const auto& loaded : _loaded_datafiles_history)
-    {
-      QString loaded_datafile = QDir(directory_path).relativeFilePath(loaded.filename);
-
-      QDomElement file_elem = doc.createElement("fileInfo");
-      file_elem.setAttribute("filename", loaded_datafile);
-      file_elem.setAttribute("prefix", loaded.prefix);
-
-      file_elem.appendChild(loaded.plugin_config.firstChild());
-      loaded_list.appendChild(file_elem);
-    }
-    root.appendChild(loaded_list);
-
-    if (_active_streamer_plugin)
-    {
-      QDomElement loaded_streamer = doc.createElement("previouslyLoaded_Streamer");
-      QString streamer_name = _active_streamer_plugin->name();
-      loaded_streamer.setAttribute("name", streamer_name);
-      root.appendChild(loaded_streamer);
-    }
+    QDomElement loaded_streamer = doc.createElement("previouslyLoaded_Streamer");
+    QString streamer_name = _active_streamer_plugin->name();
+    loaded_streamer.setAttribute("name", streamer_name);
+    root.appendChild(loaded_streamer);
   }
   //-----------------------------------
   root.appendChild(doc.createComment(" - - - - - - - - - - - - - - "));

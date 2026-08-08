@@ -47,7 +47,7 @@ public:
 
   ~MainWindow();
 
-  bool loadLayoutFromFile(QString filename, bool load_datafiles = true);
+  bool loadLayoutFromFile(QString filename);
   bool loadDataFromFiles(QStringList filenames, bool auto_prefix = false);
   std::unordered_set<std::string> loadDataFromFile(const FileLoadInfo& info, bool merge_files);
 
@@ -232,6 +232,11 @@ private:
   QDomElement savePluginState(QDomDocument& doc);
 
   std::tuple<double, double, int> calculateVisibleRangeX();
+
+  /// Amount of time a single mouse wheel notch over the time slider should move the
+  /// tracker. It is a fraction of the X range currently displayed by the plots, so that
+  /// scrolling stays fine grained when zoomed in.
+  double timeSliderWheelStep();
 
   void deleteAllData();
 

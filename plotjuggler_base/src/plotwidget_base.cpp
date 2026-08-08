@@ -607,7 +607,7 @@ bool PlotWidgetBase::eventFilter(QObject* obj, QEvent* event)
             {
               QSettings settings;
               bool autozoom_visibility =
-                  settings.value("Preferences::autozoom_visibility", true).toBool();
+                  settings.value("Preferences::autozoom_visibility", false).toBool();
               if (clicked_item == it.curve)
               {
                 it.curve->setVisible(!it.curve->isVisible());

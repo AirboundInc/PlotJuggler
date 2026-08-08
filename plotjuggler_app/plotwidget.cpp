@@ -615,7 +615,7 @@ void PlotWidget::onDropEvent(QDropEvent*)
     emit curveListChanged();
 
     QSettings settings;
-    bool autozoom_curve_added = settings.value("Preferences::autozoom_curve_added", true).toBool();
+    bool autozoom_curve_added = settings.value("Preferences::autozoom_curve_added", false).toBool();
     if (autozoom_curve_added || noCurves)
     {
       zoomOut(autozoom_curve_added);

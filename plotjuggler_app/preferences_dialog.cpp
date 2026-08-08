@@ -49,14 +49,14 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
   ui->radioLocalColorIndex->setChecked(use_plot_color_index);
   ui->radioGlobalColorIndex->setChecked(!use_plot_color_index);
 
-  bool autozoom_visibility = settings.value("Preferences::autozoom_visibility", true).toBool();
+  bool autozoom_visibility = settings.value("Preferences::autozoom_visibility", false).toBool();
   ui->checkBoxAutoZoomVisibility->setChecked(autozoom_visibility);
 
-  bool autozoom_curve_added = settings.value("Preferences::autozoom_curve_added", true).toBool();
+  bool autozoom_curve_added = settings.value("Preferences::autozoom_curve_added", false).toBool();
   ui->checkBoxAutoZoomAdded->setChecked(autozoom_curve_added);
 
   bool autozoom_filter_applied =
-      settings.value("Preferences::autozoom_filter_applied", true).toBool();
+      settings.value("Preferences::autozoom_filter_applied", false).toBool();
   ui->checkBoxAutoZoomFilter->setChecked(autozoom_filter_applied);
 
   QSize export_plot =

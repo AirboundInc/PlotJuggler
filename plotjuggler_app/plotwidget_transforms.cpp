@@ -312,7 +312,7 @@ void DialogTransformEditor::on_pushButtonSave_clicked()
 
   QSettings settings;
   bool autozoom_filter_applied =
-      settings.value("Preferences::autozoom_filter_applied", true).toBool();
+      settings.value("Preferences::autozoom_filter_applied", false).toBool();
   QDomDocument doc;
   auto elem = _plotwidget->xmlSaveState(doc);
   _plotwidget_origin->xmlLoadState(elem, autozoom_filter_applied);
