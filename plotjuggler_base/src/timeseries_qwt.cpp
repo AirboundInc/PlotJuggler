@@ -257,8 +257,7 @@ void PJPlotCurve::drawSeries(QPainter* painter, const QwtScaleMap& xMap,
                              const QwtScaleMap& yMap, const QRectF& canvasRect,
                              int from, int to) const
 {
-  // Default rendering of the actual samples (does nothing if all samples
-  // happen to fall outside the visible canvas).
+  // Default rendering of the actual samples.
   QwtPlotCurve::drawSeries(painter, xMap, yMap, canvasRect, from, to);
 
   const auto* series = data();
@@ -289,7 +288,6 @@ void PJPlotCurve::drawSeries(QPainter* painter, const QwtScaleMap& xMap,
     std::swap(x_left, x_right);
   }
 
-  const QPointF first = ts->sample(0);
   const QPointF last = ts->sample(n - 1);
 
   painter->save();
@@ -305,48 +303,19 @@ void PJPlotCurve::drawSeries(QPainter* painter, const QwtScaleMap& xMap,
     painter->drawLine(QPointF(canvasRect.left(), y_pix),
                       QPointF(canvasRect.right(), y_pix));
   }
-  else if (first.x() < x_right)
+  else if (last.x() < x_right)
   {
-    // Right extension: hold the last sample's value forward to the canvas
-    // right edge whenever the data ends before the visible window does.
-    if (last.x() < x_right)
-    {
-      const double x0_pix = xMap.transform(last.x());
-      const double y_pix = yMap.transform(last.y());
-      painter->drawLine(QPointF(x0_pix, y_pix),
-                        QPointF(canvasRect.right(), y_pix));
-    }
-    // Left extension: if there's a sample at or before the canvas left edge,
-    // hold its value into the visible window up to the next sample.
-    if (first.x() < x_left)
-    {
-      int lo = 0;
-      int hi = n - 1;
-      while (lo < hi)
-      {
-        const int mid = (lo + hi + 1) / 2;
-        if (ts->sample(mid).x() <= x_left)
-        {
-          lo = mid;
-        }
-        else
-        {
-          hi = mid - 1;
-        }
-      }
-      const QPointF held = ts->sample(lo);
-      double x_end_pix = canvasRect.right();
-      if (lo + 1 < n)
-      {
-        x_end_pix = std::min<double>(canvasRect.right(),
-                                     xMap.transform(ts->sample(lo + 1).x()));
-      }
-      const double y_pix = yMap.transform(held.y());
-      painter->drawLine(QPointF(canvasRect.left(), y_pix),
-                        QPointF(x_end_pix, y_pix));
-    }
+    // Right extension: the data ends inside the visible window, so hold the
+    // last sample's value forward to the canvas right edge.
+    const double x0_pix = xMap.transform(last.x());
+    const double y_pix = yMap.transform(last.y());
+    painter->drawLine(QPointF(x0_pix, y_pix), QPointF(canvasRect.right(), y_pix));
   }
-  // else: data is entirely after the visible range — no held value yet.
+  // else: the data extends beyond the right edge of the visible range, so
+  // QwtPlotCurve has already drawn everything that is visible. No extension on
+  // the left side: whenever a sample sits before the visible range there is a
+  // following sample, and the interpolated segment between them is drawn by the
+  // base class (holding the value here would paint a spurious horizontal line).
 
   painter->restore();
 }
