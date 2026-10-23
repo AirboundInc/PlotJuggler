@@ -349,6 +349,12 @@ if(PJ4_BUILD_APP)
     add_subdirectory(pj_app)
 endif()
 
+# Airbound in-tree plugins (plugins/), built against the pinned plotjuggler_sdk.
+option(AIRBOUND_BUILD_PLUGINS "Build the Airbound plugins in plugins/" ON)
+if(AIRBOUND_BUILD_PLUGINS)
+    add_subdirectory(plugins)
+endif()
+
 # External GPL render helper (separate executable; PlotJuggler links none of it).
 # Opt-in (PJ_BUILD_RASTER_HELPER, off by default) and only when the vendored
 # engine source is present.
