@@ -38,12 +38,12 @@ here, not fixed, unless a decision says otherwise.
 | 10 | MULT table (`Id`, `Mult` hard-typed `B`/`d`) | 365–390 | same | DONE | |
 | 11 | UNIT table (`Id`, `Label`) | 393–418 | same | DONE | Only used by #22 |
 | 12 | Drop ISBD / ISBH | 426–437 | same | DONE | |
-| 13 | MSG → log message list | 438–461 | log messages list (+ see Decision 1) | DONE | **Bug:** hardcodes old `QZ` layout. ArduPilot now logs `QBBZ` (TimeUS,ID,Seq,Message) → text gets 2 garbage bytes. Upstream fix `ArduPilot/plotjuggler-apbin-plugins@3e2f925` locates fields by name. Decision 3 |
-| 14 | PARM → latest value per name + full time series | 462–492 | same | DONE | Hardcoded `QNf` prefix still valid for newer `QNff` |
+| 13 | MSG → log message list | 438–461 | log messages list (+ see Decision 1) | DONE | **Bug:** hardcodes old `QZ` layout. ArduPilot now logs `QBBZ` (TimeUS,ID,Seq,Message) → text gets 2 garbage bytes. Upstream fix `ArduPilot/plotjuggler-apbin-plugins@3e2f925` locates fields by name. Decision 3 **Fixed in the upstream review** (fields located by name). |
+| 14 | PARM → latest value per name + full time series | 462–492 | same | DONE | Hardcoded `QNf` prefix still valid for newer `QNff` `Default` (`QNff`) now shown in Dataset Info (upstream review). |
 | 15 | Decode all 20 format types to double | 786–923 | typed `ValueRef` per format char | DONE | Unknown type: rest of the record is skipped with a stderr line, as in PJ3. **Flag:** for `a`/`n`/`N`/`Z` PJ3 pushes the previous field's value (string fields become a numeric series repeating their neighbour); translated as-is, written as `kFloat64` |
 | 16 | Instance id: numeric, or full string for `N`/`n`/`Z` | 998–1052 | same | DONE | Fix from `d3eb917d` |
 | 17 | Multipliers from FMTU×MULT, skip 0/1, warn on missing | 1087–1138 | same; field becomes `kFloat64` when a multiplier applies, native type otherwise | DONE | Values decoded to double exactly as in PJ3, then written back as the native type, so values and precision are identical to PJ3 (integers above 2^53 still round, as before) |
-| 18 | GPS time sync to Unix time (GWk/GMS, sample `[1]`, −18 leap s), applied to all TimeUS and PARM | 1142–1217 | offset added in **ns** to every timestamp | DONE | **Flags:** (a) indexes sample `[1]` → out of bounds if GPS has <2 samples; (b) missing `GWk`/`GMS` silently map to field 0 via `operator[]`; (c) uses first GPS instance. Translate as-is, but (a) must not crash the host: guard and skip sync |
+| 18 | GPS time sync to Unix time (GWk/GMS, sample `[1]`, −18 leap s), applied to all TimeUS and PARM | 1142–1217 | offset added in **ns** to every timestamp | DONE | **Flags:** (a) indexes sample `[1]` → out of bounds if GPS has <2 samples; (b) missing `GWk`/`GMS` silently map to field 0 via `operator[]`; (c) uses first GPS instance. Translate as-is, but (a) must not crash the host: guard and skip sync **(a), (b) and the GMS double scaling fixed in the upstream review**; (c) first instance kept, as upstream. |
 | 19 | Publish only messages with `TimeUS`; skip time + instance columns | 660–727 | topics per message (per instance) | DONE | Naming → Decision 2 |
 | 20 | PARM series `/_PARM/<name>` | 731–736 | topic `_PARM/<name>`, field `value` | DONE | |
 | 21 | Load stats (read/skipped msgs, skipped bytes, elapsed ms) | 763–767 | `reportMessage(kInfo, ...)` | DONE | Was stdout only |
@@ -68,24 +68,27 @@ here, not fixed, unless a decision says otherwise.
 4. **Parallel decoding → serial first.** Re-apply `87bf81ad` / `9f978e59` as a separate step
    once the serial port works, and re-measure (PJ4 forbids host writes off the import thread).
 
-## Follow-up: ArduPilot upstream review
+## ArduPilot upstream review (2026-10-23)
 
-Upstream (`ArduPilot/plotjuggler-apbin-plugins`) changes since our import (`e05c8218`, 2026-01-15),
-to evaluate one by one after the faithful port:
+Our import (`e05c8218`) is byte-identical to upstream `399136d` (2025-06-16). Reviewed against
+upstream `main` @ `3e2f925`:
 
-| Upstream | Change | Overlaps |
-|---|---|---|
-| `3e2f925` | MSG `QZ` → `QBBZ`: locate fields by name | #13 bug |
-| `39d5c7f`, `49208c1` | GPS time unavailable at log start; time-sync refactor | #18 flags (a)–(c) |
-| `632dbfd` | Message timeline + values synced to plot time | #25 (our dialog shows boot time) |
-| `76a5822` | Field descriptions parser + tooltips | new |
-| `db0618d`, `d90b7c3` | Default param values; labels for configured RCOU functions | #14, new |
-| `be8cf24` | 16-char parameter name display | #14 (we use `strnlen(16)`; verify) |
-| `e68139e` | Initialize timestamps | verify |
-| `f2f5531` | Reset per-load state | #2 (we have our own `0f5e5c4b`) |
-| `d7a72b7` | Remove force-enable of units | #22 |
+| Upstream | Change | Finding | Recommendation |
+|---|---|---|---|
+| `3e2f925` | MSG `QZ` → `QBBZ`: locate `TimeUS`/`Message` by name | Our #13 bug. AA-TRT-0051 (ArduPlane 4.5.7) is still `QZ`; upstream's test log is `QBBZ` | **Done** (clean text on the `QBBZ` test log) |
+| `39d5c7f`, `49208c1` | Time sync: anchor on the first GPS sample with NSats ≥ 4 and non-zero TimeUS/GWk/GMS; look up GWk/GMS/NSats by name, skip sync if missing | Fixes our #18 (a) and (b): sample `[1]` without a fix anchors the log to the 1980 GPS epoch | **Done** |
+| (none) | **GMS double scaling** (found in this review, also present upstream) | FMTU gives GMS multiplier `C` (×0.001), so `apply_multipliers` already converts it to seconds and `apply_timesync` multiplies by 0.001 again. Absolute times are off by GMS × 0.999 (0–7 days): AA-TRT-0051 plots at 2025-10-19 00:07 UTC instead of 2025-10-24 11:19 UTC. Relative times are unaffected | **Done**: when a multiplier was applied, recover the exact integer ms by undoing it (the log stores `C` at float precision, 0.0010000000475, ~20 ms off otherwise). AA-TRT-0051 now starts 2025-10-24 11:19:49.8 UTC; every timestamp moved by the same 472 335.072 s, series and counts unchanged |
+| `db0618d` (part) | PARM `QNff`: show each parameter's default value | Upstream appends it to the parameter name | **Done**: Dataset Info shows `value  (default d)`; read by field name, so `QNf` logs show the value only. ArduPlane 4.5.7 already logs `QNff` |
+| `db0618d`, `d90b7c3` | Rename RCOU/RCO2 `Cn` fields after their `SERVOn_FUNCTION` | Off by default upstream; renaming fields breaks layouts | Skip |
+| `76a5822` | Message/field descriptions (embedded Plane/Copter XML, ~1 MB) as tooltips | SDK 0.34.1 has no description/tooltip for scalar fields | Blocked by SDK |
+| `632dbfd` | Message timeline + log as numeric series synced to plot time | PJ3 workaround for the lack of text series; superseded by our `_MSG` topic | Skip |
+| `be8cf24` | 16-char parameter names | We already use `strnlen(name, 16)` | Nothing to do |
+| `f2f5531` | Reset per-load state | Already done (our `0f5e5c4b`, row #2) | Nothing to do |
+| `e68139e` | Initialize timestamp members | Only upstream's new members | Nothing to do |
+| `d7a72b7` | Units no longer force-enabled | Ours were never on (#22) | Nothing to do |
+| `43a8d81` | Test log `tests/logs/00000001.BIN` (1.9 MB, `QBBZ` MSG, `QNff` PARM) | Useful second fixture for the MSG fix | Use for verification |
 
-## Verification (2026-10-23)
+## Verification (2026-10-23, faithful port before the upstream review)
 
 Log `AA-TRT-0051 - 2025-10-24 11-19-54.bin` (53 MB, ArduPlane 4.5.7), loaded by PJ3's
 `DataLoadAPBin.dll` (airbound-main build of 2026-08-13) and by this plugin, each through a headless
@@ -102,3 +105,8 @@ datastore keeps them. `apbin_dump` counts those separately (`NONFINITE`); this l
 
 The PJ3 harness must run from an interactive desktop session (its progress dialog needs Qt's
 Windows event loop); it cannot run from Claude Code's shell.
+
+After the upstream review the plugin intentionally differs from PJ3: absolute timestamps (GMS fix,
+first-valid-fix anchor), MSG text on `QBBZ` logs, and parameter entries with defaults. On
+AA-TRT-0051 the series set and per-series counts are unchanged and every timestamp moved by one
+constant (472 335.072 s, ±256 ns double rounding).

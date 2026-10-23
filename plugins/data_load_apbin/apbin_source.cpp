@@ -213,6 +213,9 @@ private:
   // parameters (PARM messages) - using map to keep only the latest value per parameter
   std::map<std::string, float> log_parameters;
 
+  // parameter default values (PARM "Default" field, newer firmware only)
+  std::map<std::string, float> log_parameter_defaults;
+
   // all PARM entries with timestamps (for time-series plotting)
   struct ParmEntry { double timestamp; std::string name; float value; };
   std::vector<ParmEntry> parm_entries;
@@ -263,6 +266,7 @@ PJ::Status APBinSource::readDataFromFile()
   field_name2idx.clear();
   log_messages.clear();
   log_parameters.clear();
+  log_parameter_defaults.clear();
   parm_entries.clear();
   scaled_fields.clear();
   time_offset_s = 0.0;
@@ -611,22 +615,22 @@ PJ::Status APBinSource::readDataFromFile()
     }
     if ( memcmp(fmt.name, "MSG", 3) == 0 )
     {
-      // Parse MSG message to extract timestamp and message text
-      // MSG format is typically "QZ" with labels "TimeUS,Message"
-      // Q = uint64_t (8 bytes), Z = char[64]
-      // (PORTING.md #13: newer firmware logs "QBBZ"; fix deferred to the upstream review.)
+      // Parse MSG message to extract timestamp and message text.
+      // ArduPilot changed the MSG format from "QZ" (TimeUS,Message) to
+      // "QBBZ" (TimeUS,ID,Seq,Message), inserting two bytes before the text.
+      // Locate the fields by name from the FMT so both layouts parse correctly.
+      // (From ArduPilot/plotjuggler-apbin-plugins@3e2f925; PORTING.md #13.)
       APBinMessage log_msg;
 
-      // Skip header (3 bytes) to get to TimeUS
-      const uint8_t* msg_ptr = buf + total_bytes_used + LOG_PACKET_HEADER_LEN;
-      memcpy(&log_msg.timestamp_us, msg_ptr, sizeof(uint64_t));
-      msg_ptr += sizeof(uint64_t);
+      const uint32_t time_offset = get_field_byte_offset(type, "TimeUS");
+      const uint32_t text_offset = get_field_byte_offset(type, "Message");
+      memcpy(&log_msg.timestamp_us, buf + total_bytes_used + time_offset, sizeof(uint64_t));
 
-      // Extract message text (64 bytes max, null-terminated)
-      const char* msg_text = reinterpret_cast<const char*>(msg_ptr);
-      // Find the actual string length (up to 64 chars)
-      size_t msg_len = strnlen(msg_text, 64);
-      log_msg.message.assign(msg_text, msg_len);
+      // The Message field spans the remainder of the record. It is only
+      // null-terminated if the text is shorter than the field width.
+      const char* msg_text = reinterpret_cast<const char*>(buf + total_bytes_used + text_offset);
+      const size_t msg_field_size = text_offset < fmt.length ? fmt.length - text_offset : 0;
+      log_msg.message.assign(msg_text, strnlen(msg_text, msg_field_size));
 
       log_messages.push_back(std::move(log_msg));
 
@@ -660,6 +664,17 @@ PJ::Status APBinSource::readDataFromFile()
 
       // Keep latest value for dialog
       log_parameters[name] = value;
+
+      // Newer firmware logs "QNff" (TimeUS,Name,Value,Default): keep the default for the
+      // Dataset Info entry (ArduPilot/plotjuggler-apbin-plugins@db0618d). Located by name, so
+      // older "QNf" logs simply have none.
+      const auto& parm_fields = field_name2idx[msg_id2name[type]];
+      if (parm_fields.find("Default") != parm_fields.end())
+      {
+        float default_value;
+        memcpy(&default_value, buf + total_bytes_used + get_field_byte_offset(type, "Default"), sizeof(default_value));
+        log_parameter_defaults[name] = default_value;
+      }
 
       // Store all entries for time-series plotting
       parm_entries.push_back({timestamp, name, value});
@@ -1032,16 +1047,26 @@ PJ::Status APBinSource::publish()
     // when it is such a tie, so stepping one double ulp away from zero reproduces Qt's result
     // for ties and changes nothing else. Zero is never a tie and must not be stepped (it would
     // become the smallest subnormal).
-    nlohmann::json parameters = nlohmann::json::object();
-    for (const auto& param : log_parameters)
-    {
-      const double widened = static_cast<double>(param.second);
+    const auto format_value = [](float v) {
+      const double widened = static_cast<double>(v);
       const double qt_rounded =
           widened == 0.0 ? widened
                          : std::nextafter(widened, widened < 0 ? -std::numeric_limits<double>::infinity()
                                                                : std::numeric_limits<double>::infinity());
-      char value[32];
-      std::snprintf(value, sizeof(value), "%g", qt_rounded);
+      char text[32];
+      std::snprintf(text, sizeof(text), "%g", qt_rounded);
+      return std::string(text);
+    };
+
+    // Newer firmware also logs each parameter's default: shown after the value.
+    nlohmann::json parameters = nlohmann::json::object();
+    for (const auto& param : log_parameters)
+    {
+      std::string value = format_value(param.second);
+      if (const auto it = log_parameter_defaults.find(param.first); it != log_parameter_defaults.end())
+      {
+        value += "  (default " + format_value(it->second) + ")";
+      }
       parameters[param.first] = value;
     }
 
@@ -1432,20 +1457,45 @@ void APBinSource::apply_timesync(void)
   }
   const message_data& gps_msg_data = msg_it->second.begin()->second;
 
-  // get needed field indexes
-  const auto& gps_time_idx = field_name2idx["GPS"]["TimeUS"];
-  const auto& gps_week_idx = field_name2idx["GPS"]["GWk"]; // GWk -> GPS week
-  const auto& gps_ms_idx = field_name2idx["GPS"]["GMS"];   // GMS -> GPS seconds in week (ms)
-
-  // PJ4: PJ3 read sample [1] unchecked (out of bounds with fewer than 2 GPS samples). An
-  // out-of-bounds read could now crash the whole app, so skip the sync instead (PORTING.md #18a).
-  for (const auto idx : {gps_time_idx, gps_week_idx, gps_ms_idx})
+  // get needed field indexes, by name: a missing field skips the sync instead of silently
+  // reading field 0 (ArduPilot/plotjuggler-apbin-plugins@49208c1; PORTING.md #18b)
+  const auto& gps_fields = field_name2idx["GPS"];
+  std::array<uint8_t, 4> idx{};  // TimeUS, GWk (GPS week), GMS (GPS ms in week), NSats
+  const std::array<const char*, 4> labels = {"TimeUS", "GWk", "GMS", "NSats"};
+  for (size_t i = 0; i < labels.size(); i++)
   {
-    if (idx >= gps_msg_data.size() || gps_msg_data[idx].second.size() < 2)
+    const auto it = gps_fields.find(labels[i]);
+    if (it == gps_fields.end() || it->second >= gps_msg_data.size())
     {
-      std::printf("Skipping timesync because the GPS message has fewer than 2 samples\n");
+      std::printf("Skipping timesync because GPS message has no '%s' field!\n", labels[i]);
       return;
     }
+    idx[i] = it->second;
+  }
+  const std::vector<double>& time_vec = gps_msg_data[idx[0]].second;
+  const std::vector<double>& week_vec = gps_msg_data[idx[1]].second;
+  const std::vector<double>& ms_vec = gps_msg_data[idx[2]].second;
+  const std::vector<double>& nsats_vec = gps_msg_data[idx[3]].second;
+
+  // Anchor on the first sample with a usable fix: enough satellites and non-zero
+  // TimeUS/GWk/GMS. GWk must be checked: a sample can report satellites while the week number
+  // is still unresolved (0), which would anchor the whole log to the GPS epoch (1980-01-06).
+  // (ArduPilot/plotjuggler-apbin-plugins@39d5c7f, @49208c1; PORTING.md #18a. PJ3 used sample [1].)
+  static constexpr double MIN_VALID_NSATS = 4;
+  size_t anchor = time_vec.size();
+  for (size_t i = 0; i < time_vec.size(); i++)
+  {
+    if (i < week_vec.size() && i < ms_vec.size() && i < nsats_vec.size() && nsats_vec[i] >= MIN_VALID_NSATS &&
+        time_vec[i] != 0.0 && week_vec[i] > 0.0 && ms_vec[i] > 0.0)
+    {
+      anchor = i;
+      break;
+    }
+  }
+  if (anchor == time_vec.size())
+  {
+    std::printf("Skipping timesync because no GPS sample with a valid fix was found\n");
+    return;
   }
 
   // constant time offset variables
@@ -1453,12 +1503,26 @@ void APBinSource::apply_timesync(void)
   static constexpr double GPS2UNIX_LEAP_SECONDS = -18;        // additional time offset due to leap seconds (must be adjusted if number of leap seconds changes!)
   static constexpr double SECONDS_PER_WEEK = 604800;          // number of seconds per week
 
-  const double& gps_week = gps_msg_data[gps_week_idx].second[1];
-  const double gps_week_seconds = gps_msg_data[gps_ms_idx].second[1] * 0.001;
+  const double& gps_week = week_vec[anchor];
+
+  // GMS is logged in milliseconds. When FMTU gives it a multiplier (modern logs: 'C', 0.001),
+  // apply_multipliers() has already scaled it, and PJ3 multiplied by 0.001 a second time,
+  // shifting every absolute timestamp by GMS * 0.999 (up to 7 days; PORTING.md, upstream
+  // review). Undo the applied multiplier to recover the exact integer milliseconds instead: the
+  // multiplier is stored at float precision (0.0010000000475), which would otherwise move the
+  // anchor by ~20 ms.
+  double gps_week_ms = ms_vec[anchor];
+  const auto scaled_it = scaled_fields.find("GPS");
+  if (scaled_it != scaled_fields.end() && idx[2] < scaled_it->second.size() && scaled_it->second[idx[2]])
+  {
+    const char multiplier_char = format_units[msg_name2id["GPS"]].multipliers[idx[2]];
+    gps_week_ms = std::round(gps_week_ms / multipliers[multiplier_char]);
+  }
+  const double gps_week_seconds = gps_week_ms * 0.001;
 
   const double unix_time = gps_week * SECONDS_PER_WEEK + gps_week_seconds + GPS2UNIX_TIME_OFFSET + GPS2UNIX_LEAP_SECONDS;
 
-  const double& log_time = gps_msg_data[gps_time_idx].second[1];
+  const double& log_time = time_vec[anchor];
 
   const double time_offset = unix_time - log_time;
   time_offset_s = time_offset;
