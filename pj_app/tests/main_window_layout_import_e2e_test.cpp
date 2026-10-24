@@ -493,6 +493,7 @@ class MainWindowLayoutImportE2ETest : public ::testing::Test {
         *seen = true;
         *checkbox_seen_checked = checkbox->isChecked();  // the untouched default
       }
+      checkbox->setChecked(true);  // this scenario saves a source-bound layout
       selectPathInFileDialog(file_dialog, path);
       QMetaObject::invokeMethod(file_dialog, "accept", Qt::QueuedConnection);
     });
@@ -716,7 +717,7 @@ TEST_F(MainWindowLayoutImportE2ETest, GuiSaveUnloadReloadIsWarmAndZeroNetwork) {
   save_action->trigger();  // blocks in the modal until the driver accepts
   flushQueuedEvents();
 
-  EXPECT_TRUE(checkbox_default_checked) << "the save-data-source binding checkbox must default to CHECKED";
+  EXPECT_FALSE(checkbox_default_checked) << "the save-data-source binding checkbox must default to UNCHECKED";
   ASSERT_TRUE(QFileInfo::exists(saved_path)) << "the GUI save must have written " << saved_path.toStdString();
 
   const auto records = savedMaterializeRecords(saved_path);

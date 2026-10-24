@@ -988,6 +988,10 @@ MainWindow::MainWindow(QString extensions_dir, QWidget* parent)
   connect(&session_->catalogModel(), &CatalogModel::itemsRemoved, this, [this](const QStringList&) {
     syncWidgetsToCatalog();
   });
+  // The title names the loaded dataset(s); datasets come and go with catalog items.
+  connect(&session_->catalogModel(), &CatalogModel::cleared, this, &MainWindow::updateWindowTitle);
+  connect(&session_->catalogModel(), &CatalogModel::itemsRemoved, this, &MainWindow::updateWindowTitle);
+  connect(&session_->catalogModel(), &CatalogModel::itemsAdded, this, &MainWindow::updateWindowTitle);
   connect(session_.get(), &AppSession::datasetsMerged, this, [this](DatasetId anchor, QList<DatasetId> consumed) {
 #ifdef PJ_WITH_SCENE3D
     if (transform_service_ != nullptr) {
@@ -1271,6 +1275,21 @@ MainWindow::MainWindow(QString extensions_dir, QWidget* parent)
   // full removal returns to).
   playback.setRangeAndCurrentTime(displayRange(0.0, 0.0), displaySeconds(0.0));
   ui_->timelineWidget->setPlaybackEngine(&playback);
+  // One wheel notch over the time slider moves the cursor by 1% of the
+  // narrowest visible time-series plot, so the step follows the zoom level.
+  ui_->timelineWidget->setWheelStepProvider([this]() {
+    double narrowest_span = 0.0;
+    forEachPlot([&narrowest_span](PlotWidget* plot) {
+      if (!plot->isVisible() || plot->isXYPlot() || plot->curveList().empty()) {
+        return;
+      }
+      const double span = plot->currentBoundingRect().width();
+      if (span > 0.0 && std::isfinite(span) && (narrowest_span == 0.0 || span < narrowest_span)) {
+        narrowest_span = span;
+      }
+    });
+    return narrowest_span / 100.0;  // 0 (no plotted data) keeps the Step-size spinner
+  });
   // Cap the cursor-move fan-out at ~30 Hz (kTrackerBroadcastIntervalMs). currentTimeChanged
   // fires on playback ticks, scrubbing, and seeks — all of which can exceed 30 Hz (a fast
   // scrub emits at mouse-move rate). The coalescer runs broadcastTrackerTime(latest) on the
@@ -2911,6 +2930,21 @@ void MainWindow::onOpenMarketplace() {
   marketplace_container_ = wrapped.container;
   mkt->activateEmbedded();
 #endif
+}
+
+void MainWindow::updateWindowTitle() {
+  const QString app_name = QApplication::applicationDisplayName();
+  const auto datasets = session_->catalogModel().datasets();
+  QString title = app_name;
+  if (datasets.size() == 1) {
+    title = tr("%1 - %2").arg(datasets.front().second, app_name);
+  } else if (datasets.size() > 1) {
+    title = tr("%1 datasets - %2").arg(datasets.size()).arg(app_name);
+  }
+  // Ending with the display name stops Windows/X11 from appending it again.
+  if (windowTitle() != title) {
+    setWindowTitle(title);
+  }
 }
 
 void MainWindow::onLoadDataRequested() {
@@ -4739,8 +4773,9 @@ void MainWindow::onSaveLayout() {
   // layout reloads this exact file. Unchecked = generic: the layout carries
   // no file reference and binds its curves (by topic+field) to whatever
   // dataset is loaded when it's opened — for reuse across similar recordings.
-  // Default ON matches PJ3 and the common "save, reload later" workflow.
-  const FileDialog::ExtraOption save_source_opt{tr("Bind to this data source"), /*default_checked=*/true};
+  // Default OFF: a layout is mostly reused across logs and shared, and a bound
+  // one reopens a specific (possibly someone else's, or moved) file.
+  const FileDialog::ExtraOption save_source_opt{tr("Bind to this data source"), /*default_checked=*/false};
   const auto result = FileDialog::getSaveFileNameWithOptions(
       this, tr("Save Layout"), start_dir, tr(kLayoutFilter), default_suffix, {save_source_opt}, this);
 

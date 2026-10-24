@@ -590,6 +590,10 @@ class MainWindow : public QMainWindow {
   // context-menu reload.
   void reloadSource(const QString& path, const QString& plugin_id, const QString& plugin_config_json);
 
+  // Window/taskbar title: "<dataset> - PlotJuggler 4" for one loaded dataset,
+  // "<n> datasets - ..." for several, the plain app name for none.
+  void updateWindowTitle();
+
   // Sets legend position (or hides if `position` already matches the
   // current state — clicking the active corner toggles the legend off).
   // Updates QSettings, refreshes button checked states, and re-applies

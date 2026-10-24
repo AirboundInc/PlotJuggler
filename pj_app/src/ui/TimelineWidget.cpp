@@ -270,6 +270,10 @@ void TimelineWidget::applySliderStep() {
   }
 }
 
+void TimelineWidget::setWheelStepProvider(std::function<double()> provider) {
+  ui_->timeSlider->setWheelStepProvider(std::move(provider));
+}
+
 void TimelineWidget::onStylesheetChanged(QString theme) {
   applyIcons(theme);
 }

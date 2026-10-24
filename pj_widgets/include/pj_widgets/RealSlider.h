@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <QSlider>
+#include <QWheelEvent>
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <utility>
 
 namespace PJ {
 
@@ -52,9 +55,33 @@ class RealSlider : public QSlider {
   }
 
   void setRealStepValue(double step) {
-    const double ratio = (max_value_ - min_value_) / static_cast<double>(maximum() - minimum());
-    const int new_step = std::max(1, static_cast<int>(std::round(step / ratio)));
-    QSlider::setSingleStep(new_step);
+    QSlider::setSingleStep(realToTicks(step));
+  }
+
+  // Amount of value one mouse-wheel notch moves the slider, asked on every
+  // wheel event so it can follow e.g. the plots' zoom level. Unset, or a
+  // result <= 0, keeps QSlider's own wheel handling (the single step).
+  void setWheelStepProvider(std::function<double()> provider) {
+    wheel_step_provider_ = std::move(provider);
+  }
+
+ protected:
+  void wheelEvent(QWheelEvent* event) override {
+    const double step = wheel_step_provider_ ? wheel_step_provider_() : 0.0;
+    if (!(step > 0.0) || !std::isfinite(step)) {
+      QSlider::wheelEvent(event);
+      return;
+    }
+    // Accumulate partial notches so high-resolution wheels and touchpads still move it.
+    const QPoint delta = event->angleDelta();
+    wheel_remainder_ += delta.y() != 0 ? delta.y() : delta.x();
+    const int notches = wheel_remainder_ / QWheelEvent::DefaultDeltasPerStep;
+    if (notches != 0) {
+      wheel_remainder_ -= notches * QWheelEvent::DefaultDeltasPerStep;
+      // Scrolling up / away from the user moves forward, like QSlider.
+      setValue(value() + notches * realToTicks(step));
+    }
+    event->accept();
   }
 
  signals:
@@ -70,8 +97,20 @@ class RealSlider : public QSlider {
   }
 
  private:
+  // A value span converted to slider ticks, at least one.
+  [[nodiscard]] int realToTicks(double step) const {
+    const int ticks = maximum() - minimum();
+    if (ticks <= 0 || max_value_ <= min_value_) {
+      return 1;
+    }
+    const double ratio = (max_value_ - min_value_) / static_cast<double>(ticks);
+    return std::max(1, static_cast<int>(std::round(step / ratio)));
+  }
+
   double min_value_ = 0.0;
   double max_value_ = 1.0;
+  std::function<double()> wheel_step_provider_;
+  int wheel_remainder_ = 0;
 };
 
 }  // namespace PJ

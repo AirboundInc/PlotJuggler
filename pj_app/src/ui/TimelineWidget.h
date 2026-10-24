@@ -4,6 +4,7 @@
 
 #include <QTimer>
 #include <QWidget>
+#include <functional>
 
 #include "pj_widgets/ChromeMetrics.h"
 
@@ -26,6 +27,9 @@ class TimelineWidget : public QWidget {
 
   void setPlaybackEngine(PlaybackEngine* engine);
   void setSeekLocked(bool locked);
+  // Seconds one wheel notch over the time slider moves the cursor (asked per
+  // notch). Unset or <= 0 falls back to the Step-size spinner.
+  void setWheelStepProvider(std::function<double()> provider);
 
  public slots:
   void onStylesheetChanged(QString theme);
