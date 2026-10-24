@@ -150,7 +150,16 @@ std::optional<Range<double>> DatastoreCurveAdapter::visibleYRange(Range<double> 
     const DisplayOffset offset = displayOffsetNow();
     const Timestamp raw_a = displaySecondsToRawNs(x_range_sec.min, offset);
     const Timestamp raw_b = displaySecondsToRawNs(x_range_sec.max, offset);
-    bounds = series_or->bounds(Range<Timestamp>{.min = std::min(raw_a, raw_b), .max = std::max(raw_a, raw_b)});
+    const Timestamp raw_min = std::min(raw_a, raw_b);
+    bounds = series_or->bounds(Range<Timestamp>{.min = raw_min, .max = std::max(raw_a, raw_b)});
+    // The series ended before the window: PlotCurve holds its last value across
+    // the canvas, so that value must still count toward the Y fit.
+    if (!bounds.has_value() && !series_or->sampleAtOrAfterTime(raw_min).has_value()) {
+      const auto held = series_or->sampleBeforeTime(raw_min);
+      if (held.has_value() && std::isfinite(held->value)) {
+        return Range<double>{.min = held->value, .max = held->value};
+      }
+    }
   }
 
   if (!bounds.has_value()) {

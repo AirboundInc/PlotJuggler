@@ -21,6 +21,15 @@ class PlotCurve : public QwtPlotCurve {
   [[nodiscard]] double dotWidth() const;
 
  protected:
+  /// Draws the samples, then holds the last value of a time series forward to
+  /// the right edge of the canvas when the series ends inside (or before) the
+  /// visible window, so a series with one sample (an ArduPilot parameter) or
+  /// one that stopped updating is still visible. Lines and Steps only; XY and
+  /// other non-datastore series are drawn unchanged.
+  void drawSeries(
+      QPainter* painter, const QwtScaleMap& x_map, const QwtScaleMap& y_map, const QRectF& canvas_rect, int from,
+      int to) const override;
+
   void drawCurve(
       QPainter* painter, int style, const QwtScaleMap& x_map, const QwtScaleMap& y_map, const QRectF& canvas_rect,
       int from, int to) const override;

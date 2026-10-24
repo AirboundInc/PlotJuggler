@@ -193,6 +193,18 @@ TEST_F(DatastoreCurveAdapterTest, VisibleYRangeUsesSeriesSamples) {
   EXPECT_DOUBLE_EQ(partial->max, 16.0);
 }
 
+// A window after the series' last sample still reports that held value (the
+// curve draws it across the canvas); a window before the first sample has no
+// held value yet.
+TEST_F(DatastoreCurveAdapterTest, VisibleYRangeHoldsLastValueAfterSeriesEnd) {
+  const auto after_end = adapter_->visibleYRange(Range<double>{.min = 8.0, .max = 9.0});
+  ASSERT_TRUE(after_end.has_value());
+  EXPECT_DOUBLE_EQ(after_end->min, 19.0);
+  EXPECT_DOUBLE_EQ(after_end->max, 19.0);
+
+  EXPECT_FALSE(adapter_->visibleYRange(Range<double>{.min = -5.0, .max = -3.0}).has_value());
+}
+
 TEST_F(DatastoreCurveAdapterTest, TopicCommitGrowsIndexedSize) {
   ASSERT_EQ(adapter_->size(), 9U);
 
