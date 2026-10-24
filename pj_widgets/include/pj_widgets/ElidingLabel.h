@@ -78,7 +78,10 @@ class ElidingLabel : public QLabel {
       }
       return;
     }
-    if (!isVisible()) {
+    // Never show a parentless label: it would open as an empty top-level
+    // window (CurveEditor builds its row labels before reparenting them).
+    // A child label still appears with its parent.
+    if (!isVisible() && !isWindow()) {
       setVisible(true);
     }
     const QFontMetrics metrics(font());

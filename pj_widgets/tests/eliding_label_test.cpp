@@ -97,4 +97,21 @@ TEST(ElidingLabelTest, FontChangeReElidesAtLastBudget) {
   EXPECT_LE(QFontMetrics(bigger).horizontalAdvance(lines[1]), 200);
 }
 
+// A label built without a parent (CurveEditor reparents its row labels after
+// setting their text) must not show itself, or it opens as an empty window.
+// Once reparented it still appears with its parent.
+TEST(ElidingLabelTest, ParentlessLabelDoesNotOpenAWindow) {
+  auto* label = new PJ::ElidingLabel();
+  label->setElideMode(Qt::ElideLeft);
+  label->setFullText(kLongText);
+  label->applyAvailableWidth(200);
+  EXPECT_FALSE(label->isVisible());
+  EXPECT_FALSE(label->text().isEmpty());
+
+  QWidget parent;
+  label->setParent(&parent);
+  parent.show();
+  EXPECT_TRUE(label->isVisible());
+}
+
 }  // namespace
