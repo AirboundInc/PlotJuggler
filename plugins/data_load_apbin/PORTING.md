@@ -110,3 +110,15 @@ After the upstream review the plugin intentionally differs from PJ3: absolute ti
 first-valid-fix anchor), MSG text on `QBBZ` logs, and parameter entries with defaults. On
 AA-TRT-0051 the series set and per-series counts are unchanged and every timestamp moved by one
 constant (472 335.072 s, ±256 ns double rounding).
+
+## PJ4-only additions
+
+- **Vehicle pose for the 3D view (2026-10-24).** Object topic `_TF` (`kFrameTransforms`), one
+  `world -> vehicle` transform per EKF sample: XKF1 of the primary EKF3 core at each moment, as
+  reported by XKF4's `PI` (core 0 if XKF4 is missing); no 3D pose without XKF1. Position is `PN/PE/PD` (metres from the EKF origin) converted to ENU
+  (x = east, y = north, z = up); attitude is `Roll/Pitch/Yaw` converted from body FRD in NED to
+  body FLU in ENU (REP-103), so the frame's x axis is the nose. Checked on AA-TRT-0051 with
+  `apbin_dump` (`OBJECT`/`TF` lines): 5652 transforms, translation and heading match the raw XKF1
+  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_TF` onto an empty
+  plot area to open a 3D view, then right-click the `vehicle` frame for "Create trail" and "Follow
+  this frame" (also in the 3D settings panel: Create Trail, Follow frame, Frames size).

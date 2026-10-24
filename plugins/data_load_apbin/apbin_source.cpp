@@ -28,6 +28,7 @@
 #include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <pj_base/builtin/frame_transforms_codec.hpp>
 #include <pj_base/sdk/data_source_patterns.hpp>
 #include <stdexcept>
 #include <string>
@@ -124,6 +125,71 @@ PJ::sdk::ValueRef value_ref_for(PJ::PrimitiveType type, double value)
 PJ::Timestamp to_timestamp(double seconds)
 {
   return PJ::Timestamp{static_cast<int64_t>(std::llround(seconds * 1e9))};
+}
+
+// Vehicle pose for the 3D view. ArduPilot logs attitude as body FRD relative to NED (Euler ZYX,
+// degrees); the 3D view uses ROS conventions (world ENU, body FLU, REP-103). With T the NED->ENU
+// swap and S the FLU->FRD flip, R_enu_flu = T * Rz(yaw) Ry(pitch) Rx(roll) * S.
+PJ::sdk::Quaternion enu_flu_quaternion(double roll_deg, double pitch_deg, double yaw_deg)
+{
+  constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+  const double cr = std::cos(roll_deg * kDegToRad), sr = std::sin(roll_deg * kDegToRad);
+  const double cp = std::cos(pitch_deg * kDegToRad), sp = std::sin(pitch_deg * kDegToRad);
+  const double cy = std::cos(yaw_deg * kDegToRad), sy = std::sin(yaw_deg * kDegToRad);
+  // Body FRD -> NED.
+  const double ned[3][3] = {
+      {cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr},
+      {sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr},
+      {-sp, cp * sr, cp * cr},
+  };
+  // T swaps rows 0/1 and negates row 2; S negates columns 1 and 2.
+  double m[3][3];
+  const int row_of[3] = {1, 0, 2};
+  const double row_sign[3] = {1.0, 1.0, -1.0};
+  const double col_sign[3] = {1.0, -1.0, -1.0};
+  for (int r = 0; r < 3; ++r)
+  {
+    for (int c = 0; c < 3; ++c)
+    {
+      m[r][c] = row_sign[r] * ned[row_of[r]][c] * col_sign[c];
+    }
+  }
+  // Rotation matrix -> unit quaternion (Shepperd's method).
+  PJ::sdk::Quaternion q;
+  const double trace = m[0][0] + m[1][1] + m[2][2];
+  if (trace > 0.0)
+  {
+    const double s = std::sqrt(trace + 1.0) * 2.0;
+    q.w = 0.25 * s;
+    q.x = (m[2][1] - m[1][2]) / s;
+    q.y = (m[0][2] - m[2][0]) / s;
+    q.z = (m[1][0] - m[0][1]) / s;
+  }
+  else if (m[0][0] > m[1][1] && m[0][0] > m[2][2])
+  {
+    const double s = std::sqrt(1.0 + m[0][0] - m[1][1] - m[2][2]) * 2.0;
+    q.w = (m[2][1] - m[1][2]) / s;
+    q.x = 0.25 * s;
+    q.y = (m[0][1] + m[1][0]) / s;
+    q.z = (m[0][2] + m[2][0]) / s;
+  }
+  else if (m[1][1] > m[2][2])
+  {
+    const double s = std::sqrt(1.0 + m[1][1] - m[0][0] - m[2][2]) * 2.0;
+    q.w = (m[0][2] - m[2][0]) / s;
+    q.x = (m[0][1] + m[1][0]) / s;
+    q.y = 0.25 * s;
+    q.z = (m[1][2] + m[2][1]) / s;
+  }
+  else
+  {
+    const double s = std::sqrt(1.0 + m[2][2] - m[0][0] - m[1][1]) * 2.0;
+    q.w = (m[1][0] - m[0][1]) / s;
+    q.x = (m[0][2] + m[2][0]) / s;
+    q.y = (m[1][2] + m[2][1]) / s;
+    q.z = 0.25 * s;
+  }
+  return q;
 }
 
 class APBinSource : public PJ::FileSourceBase
@@ -229,6 +295,9 @@ private:
 
   PJ::Status readDataFromFile();
   PJ::Status publish();
+
+  // PJ4: vehicle pose (world -> vehicle) from the EKF, as a transform topic for the 3D view.
+  PJ::Status publish_vehicle_transforms();
 
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);
@@ -1035,6 +1104,11 @@ PJ::Status APBinSource::publish()
     }
   }
 
+  if (auto status = publish_vehicle_transforms(); !status)
+  {
+    return status;
+  }
+
   // PJ3: show the log info dialog (Parameters / Message Logs) if there are any messages or
   // parameters. PJ4 (decision 1): the same content goes into the dataset metadata, shown in the
   // host's Dataset Info window.
@@ -1091,6 +1165,161 @@ PJ::Status APBinSource::publish()
 }
 
 
+PJ::Status APBinSource::publish_vehicle_transforms()
+{
+  // PJ4: new in the port (not in PJ3). XKF1, one instance per EKF3 core, carries the local
+  // position (metres north/east/down from the EKF origin) and the attitude together. The pose
+  // follows the primary core over time, as reported by XKF4's PI field (core 0 if not logged).
+  const char* const kFields[] = {"TimeUS", "PN", "PE", "PD", "Roll", "Pitch", "Yaw"};
+  constexpr size_t kFieldCount = std::size(kFields);
+
+  const auto xkf1_it = messages_map.find("XKF1");
+  if (xkf1_it == messages_map.end() || xkf1_it->second.empty())
+  {
+    return PJ::okStatus();  // no EKF3 output in this log: no 3D pose
+  }
+
+  // Field positions and units, identical for every core.
+  const auto& name2idx = field_name2idx["XKF1"];
+  const uint8_t msg_id = msg_name2id["XKF1"];
+  const std::vector<bool>& scaled = scaled_fields["XKF1"];
+  uint8_t field_idx[kFieldCount] = {};
+  double factors[kFieldCount] = {};
+  for (size_t i = 0; i < kFieldCount; i++)
+  {
+    const auto idx_it = name2idx.find(kFields[i]);
+    if (idx_it == name2idx.end())
+    {
+      runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
+                                  std::string("ArduPilot Bin: XKF1 has no '") + kFields[i] +
+                                      "' field, the 3D vehicle pose is not available");
+      return PJ::okStatus();
+    }
+    const uint8_t idx = idx_it->second;
+    field_idx[i] = idx;
+    // Without FMTU no multiplier was applied: the centi-unit formats are still x100.
+    const char format_char = formats[msg_id].format[idx];
+    const bool centi = format_char == 'c' || format_char == 'C' || format_char == 'e' || format_char == 'E';
+    factors[i] = (i > 0 && centi && !(idx < scaled.size() && scaled[idx])) ? 0.01 : 1.0;
+  }
+
+  // Primary core over time: XKF4.PI. Every core's XKF4 logs it; use core 0's (else the first).
+  std::vector<double> primary_times;
+  std::vector<double> primary_cores;
+  if (const auto xkf4_it = messages_map.find("XKF4"); xkf4_it != messages_map.end() && !xkf4_it->second.empty())
+  {
+    const auto inst_it = xkf4_it->second.find("0");
+    const message_data& xkf4 = inst_it != xkf4_it->second.end() ? inst_it->second : xkf4_it->second.begin()->second;
+    const auto& xkf4_idx = field_name2idx["XKF4"];
+    const auto time_it = xkf4_idx.find("TimeUS");
+    const auto pi_it = xkf4_idx.find("PI");
+    if (time_it != xkf4_idx.end() && pi_it != xkf4_idx.end() && time_it->second < xkf4.size() &&
+        pi_it->second < xkf4.size())
+    {
+      primary_times = xkf4[time_it->second].second;
+      primary_cores = xkf4[pi_it->second].second;
+      const size_t n = std::min(primary_times.size(), primary_cores.size());
+      primary_times.resize(n);
+      primary_cores.resize(n);
+    }
+  }
+  if (primary_times.empty())
+  {
+    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
+                                "ArduPilot Bin: no XKF4 primary-core index (PI) in this log, the 3D vehicle pose "
+                                "uses EKF core 0");
+  }
+  // The core that was primary at time t: the last PI logged at or before t (the first PI before
+  // the first XKF4 sample).
+  const auto primary_at = [&](double t) {
+    if (primary_times.empty())
+    {
+      return 0L;
+    }
+    const auto it = std::upper_bound(primary_times.begin(), primary_times.end(), t);
+    const size_t k = it == primary_times.begin() ? 0 : static_cast<size_t>(it - primary_times.begin()) - 1;
+    return std::lround(primary_cores[k]);
+  };
+
+  // XKF1 samples of whichever core was primary at their time, merged in time order.
+  struct PoseSample
+  {
+    double time;
+    const message_data* data;
+    size_t row;
+  };
+  std::vector<PoseSample> samples;
+  for (const auto& [instance, data] : xkf1_it->second)
+  {
+    long core = 0;
+    if (has_instance[msg_id])
+    {
+      char* end = nullptr;
+      core = std::strtol(instance.c_str(), &end, 10);
+      if (end == instance.c_str() || *end != '\0')
+      {
+        continue;  // not a numeric core index
+      }
+    }
+    size_t count = std::numeric_limits<size_t>::max();
+    for (const uint8_t idx : field_idx)
+    {
+      count = idx < data.size() ? std::min(count, data[idx].second.size()) : 0;
+    }
+    if (count == 0)
+    {
+      continue;
+    }
+    const std::vector<double>& times = data[field_idx[0]].second;
+    for (size_t row = 0; row < count; row++)
+    {
+      if (primary_at(times[row]) == core)
+      {
+        samples.push_back({times[row], &data, row});
+      }
+    }
+  }
+  std::stable_sort(samples.begin(), samples.end(),
+                   [](const PoseSample& a, const PoseSample& b) { return a.time < b.time; });
+
+  const auto* object_host = objectWriteHost();
+  if (object_host == nullptr)
+  {
+    return PJ::okStatus();  // host without an object store: numeric data only
+  }
+  auto topic = object_host->registerTopic("_TF", PJ::sdk::BuiltinObjectType::kFrameTransforms);
+  if (!topic)
+  {
+    return PJ::unexpected(topic.error());
+  }
+
+  PJ::sdk::FrameTransforms message;
+  message.transforms.resize(1);
+  PJ::sdk::FrameTransform& tf = message.transforms.front();
+  tf.parent_frame_id = "world";
+  tf.child_frame_id = "vehicle";
+  for (const PoseSample& sample : samples)
+  {
+    const auto value = [&](size_t field) { return (*sample.data)[field_idx[field]].second[sample.row] * factors[field]; };
+    const double north = value(1), east = value(2), down = value(3);
+    const double roll = value(4), pitch = value(5), yaw = value(6);
+    if (!std::isfinite(north) || !std::isfinite(east) || !std::isfinite(down) || !std::isfinite(roll) ||
+        !std::isfinite(pitch) || !std::isfinite(yaw))
+    {
+      continue;
+    }
+    tf.timestamp = to_timestamp(sample.time);
+    tf.translation = {.x = east, .y = north, .z = -down};
+    tf.rotation = enu_flu_quaternion(roll, pitch, yaw);
+    const std::vector<uint8_t> bytes = PJ::serializeFrameTransforms(message);
+    if (auto status = object_host->pushOwned(*topic, tf.timestamp, PJ::Span<const uint8_t>(bytes.data(), bytes.size()));
+        !status)
+    {
+      return status;
+    }
+  }
+  return PJ::okStatus();
+}
 
 
 void APBinSource::handle_message_received(const struct log_Format& fmt, const uint8_t* msg)

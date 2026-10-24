@@ -10,7 +10,10 @@
 // Output, one line per series, sorted by name:
 //   SERIES <topic>/<field> count=<n> t0=<ns> t1=<ns> hash=<fnv1a of (ns, value bits)>
 // Points are stable-sorted by time before hashing (PJ3's PlotData keeps series time-sorted).
+// Object topics (pj.source_object_write.v1) print one OBJECT summary line each; FrameTransforms
+// topics also print TF lines for a few decoded samples.
 
+#include <pj_base/builtin/frame_transforms_codec.hpp>
 #include <pj_base/data_source_protocol.h>
 #include <pj_base/plugin_data_api.h>
 
@@ -58,6 +61,12 @@ struct Topic {
   std::map<std::string, uint32_t, std::less<>> field_ids;
 };
 
+struct ObjectTopic {
+  std::string name;
+  std::string metadata;
+  std::vector<std::pair<int64_t, std::vector<uint8_t>>> entries;
+};
+
 double toDouble(const PJ_scalar_value_t& v) {
   switch (v.type) {
     case PJ_PRIMITIVE_TYPE_FLOAT32: return v.data.as_float32;
@@ -96,6 +105,13 @@ class FakeHost {
     runtime_vt_.request_stop = &FakeHost::requestStop;
     runtime_vt_.set_dataset_metadata = &FakeHost::setDatasetMetadata;
 
+    object_vt_.abi_version = PJ_ABI_VERSION;
+    object_vt_.struct_size = sizeof(object_vt_);
+    object_vt_.register_topic = &FakeHost::registerObjectTopic;
+    object_vt_.push_owned = &FakeHost::pushOwned;
+    object_vt_.push_lazy = &FakeHost::pushLazy;
+    object_vt_.set_retention_budget = &FakeHost::setRetentionBudget;
+
     registry_vt_.protocol_version = 1;
     registry_vt_.struct_size = sizeof(registry_vt_);
     registry_vt_.get_service = &FakeHost::getService;
@@ -109,6 +125,7 @@ class FakeHost {
   std::map<std::string, uint32_t, std::less<>> topic_ids;
   std::vector<std::string> messages;
   std::string metadata;
+  std::vector<ObjectTopic> object_topics;
 
  private:
   static FakeHost* self(void* ctx) {
@@ -122,6 +139,10 @@ class FakeHost {
     }
     if (sv(name) == "pj.runtime.v1") {
       *out = {ctx, &self(ctx)->runtime_vt_};
+      return true;
+    }
+    if (sv(name) == "pj.source_object_write.v1") {
+      *out = {ctx, &self(ctx)->object_vt_};
       return true;
     }
     setError(err, "service not provided by apbin_dump: " + std::string(sv(name)));
@@ -227,6 +248,43 @@ class FakeHost {
     return true;
   }
 
+  static bool registerObjectTopic(
+      void* ctx, PJ_string_view_t name, PJ_string_view_t metadata, PJ_object_topic_handle_t* out,
+      PJ_error_t* err) noexcept {
+    auto* h = self(ctx);
+    for (const auto& topic : h->object_topics) {
+      if (topic.name == sv(name)) {
+        setError(err, "object topic already registered: " + topic.name);
+        return false;
+      }
+    }
+    h->object_topics.push_back({std::string(sv(name)), std::string(sv(metadata)), {}});
+    out->id = static_cast<uint32_t>(h->object_topics.size());  // 0 is the invalid handle
+    return true;
+  }
+  static bool pushOwned(
+      void* ctx, PJ_object_topic_handle_t topic, int64_t ts, const uint8_t* data, uint64_t size,
+      PJ_error_t* err) noexcept {
+    auto* h = self(ctx);
+    if (topic.id == 0 || topic.id > h->object_topics.size()) {
+      setError(err, "bad object topic handle");
+      return false;
+    }
+    h->object_topics[topic.id - 1].entries.emplace_back(ts, std::vector<uint8_t>(data, data + size));
+    return true;
+  }
+  static bool pushLazy(
+      void*, PJ_object_topic_handle_t, int64_t, PJ_lazy_fetch_fn_t, void* fetch_ctx, void (*destroy)(void*),
+      PJ_error_t* err) noexcept {
+    if (destroy != nullptr) {
+      destroy(fetch_ctx);
+    }
+    setError(err, "apbin_dump does not support lazy object entries");
+    return false;
+  }
+  static void setRetentionBudget(void*, PJ_object_topic_handle_t, int64_t, uint64_t) noexcept {}
+
+  PJ_object_write_host_vtable_t object_vt_{};
   PJ_source_write_host_vtable_t write_vt_{};
   PJ_data_source_runtime_host_vtable_t runtime_vt_{};
   PJ_service_registry_vtable_t registry_vt_{};
@@ -332,6 +390,34 @@ int main(int argc, char** argv) {
   }
   for (const auto& [name, field] : numeric) {
     printSeries(name, field->points);
+  }
+  for (const auto& object : host.object_topics) {
+    const long long t0 = object.entries.empty() ? 0 : object.entries.front().first;
+    const long long t1 = object.entries.empty() ? 0 : object.entries.back().first;
+    std::printf("OBJECT %s count=%zu t0=%lld t1=%lld meta=%s\n", object.name.c_str(), object.entries.size(), t0, t1,
+                object.metadata.c_str());
+    if (object.metadata.find("kFrameTransforms") == std::string::npos || object.entries.empty()) {
+      continue;
+    }
+    // A few evenly spaced samples, decoded, with the heading implied by the rotation
+    // (ENU yaw of the body x axis, converted back to a compass bearing).
+    const size_t n = object.entries.size();
+    for (size_t k = 0; k < 5; ++k) {
+      const auto& [ts, bytes] = object.entries[k * (n - 1) / 4];
+      const auto decoded = PJ::deserializeFrameTransforms(bytes.data(), bytes.size());
+      if (!decoded || decoded->transforms.empty()) {
+        std::printf("TF %lld <decode failed>\n", static_cast<long long>(ts));
+        continue;
+      }
+      const auto& tf = decoded->transforms.front();
+      const auto& q = tf.rotation;
+      const double enu_yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      double bearing = 90.0 - enu_yaw * 180.0 / 3.14159265358979323846;
+      bearing = std::fmod(bearing + 360.0, 360.0);
+      std::printf("TF %lld %s->%s xyz=(%.2f, %.2f, %.2f) q=(%.4f, %.4f, %.4f, %.4f) bearing=%.1f\n",
+                  static_cast<long long>(ts), tf.parent_frame_id.c_str(), tf.child_frame_id.c_str(),
+                  tf.translation.x, tf.translation.y, tf.translation.z, q.x, q.y, q.z, q.w, bearing);
+    }
   }
   for (const auto& message : host.messages) {
     std::printf("REPORT %s\n", message.c_str());
