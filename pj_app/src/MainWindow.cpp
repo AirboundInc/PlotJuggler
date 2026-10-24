@@ -15,6 +15,9 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDesktopServices>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #if QT_CONFIG(process)
 #include <QProcess>
 #endif
@@ -583,6 +586,9 @@ MainWindow::MainWindow(QString extensions_dir, QWidget* parent)
   setMouseTracking(custom_frame_);
 
   ui_->setupUi(this);
+#ifndef PJ_TARGET_WASM
+  setAcceptDrops(true);  // drag-and-drop of data files and layouts (dropEvent)
+#endif
 
   // Hard-zero contents margins on the central widget and every
   // intermediate container down to the chrome rows. Qt's main-window
@@ -3535,6 +3541,56 @@ void MainWindow::sendTelemetryPing(const QString& installation) {
     telemetry_ping_ = new TelemetryPing(this);
   }
   telemetry_ping_->send(installation);
+}
+
+namespace {
+// Existing local files in a drag payload; empty when it carries anything else.
+QStringList droppedLocalFiles(const QMimeData* mime_data) {
+  QStringList paths;
+  if (mime_data == nullptr || !mime_data->hasUrls()) {
+    return paths;
+  }
+  for (const QUrl& url : mime_data->urls()) {
+    const QString path = url.toLocalFile();
+    if (path.isEmpty() || !QFileInfo(path).isFile()) {
+      return {};
+    }
+    paths << path;
+  }
+  return paths;
+}
+}  // namespace
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
+  if (!droppedLocalFiles(event->mimeData()).isEmpty()) {
+    event->acceptProposedAction();
+    return;
+  }
+  QMainWindow::dragEnterEvent(event);
+}
+
+void MainWindow::dropEvent(QDropEvent* event) {
+  const QStringList paths = droppedLocalFiles(event->mimeData());
+  if (paths.isEmpty()) {
+    QMainWindow::dropEvent(event);
+    return;
+  }
+  event->acceptProposedAction();
+  // Load after the drop returns: a plugin's config dialog opened inside the
+  // drop would stall the drag source (Explorer) until it closes.
+  QTimer::singleShot(0, this, [this, paths]() {
+    QStringList layouts;
+    for (const QString& path : paths) {
+      if (path.endsWith(u".pj4.xml"_s, Qt::CaseInsensitive)) {
+        layouts << path;
+      } else {
+        file_loader_->loadFile(path, this);
+      }
+    }
+    for (const QString& path : layouts) {
+      loadLayoutFromPath(path, LayoutLoadInteractivity::kInteractive);
+    }
+  });
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {

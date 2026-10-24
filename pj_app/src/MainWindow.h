@@ -48,6 +48,8 @@
 class QAction;
 class QButtonGroup;
 class QCloseEvent;
+class QDragEnterEvent;
+class QDropEvent;
 class QMenu;
 class QPaintEvent;
 class QPushButton;
@@ -1190,6 +1192,11 @@ class MainWindow : public QMainWindow {
   // (constructor-time sizing doesn't stick and left the strip squashed), sized
   // deferred after the first layout pass.
   void showEvent(QShowEvent* event) override;
+
+  // Files dropped on the window load like File > Open; *.pj4.xml loads as a
+  // layout. Plots and docks ignore file drags, so they reach the window.
+  void dragEnterEvent(QDragEnterEvent* event) override;
+  void dropEvent(QDropEvent* event) override;
 
   // Keeps the toast stack pinned to the bottom-right corner as the window
   // resizes.
