@@ -14,6 +14,8 @@
     3. resolve the curated plugin ids from pj-plugin-registry (unless
        -SkipPlugins), verify each published ZIP's SHA-256, and unpack it into
        data/lib/plotjuggler/plugins
+    3b. stage the locally built plugins found in -LocalPluginDirs (by default
+       the in-tree plugins/ output, <BuildDir>/airbound_plugins) the same way
     4. windeployqt the exe AND every bundled plugin DLL — matches PJ3 (a plugin can
        pull Qt modules the main exe does not)
     5. copy the FFmpeg + CPython + other Conan-shared runtime DLLs from the
@@ -57,6 +59,14 @@
 
 .PARAMETER PluginPlatform
   Registry platform key. The x64 Windows installer uses windows-x86_64.
+
+.PARAMETER LocalPluginDirs
+  Directories of locally built plugins to bundle next to the registry ones. Each
+  <name>_plugin.dll needs its <name>_plugin.pjmanifest.json sidecar (written by
+  pj_configure_plugin); it is staged as plugins/<id>/ and validated like the
+  registry plugins. Default: <BuildDir>/airbound_plugins, the in-tree plugins/
+  output (AIRBOUND_BUILD_PLUGINS). Pass @() to bundle none. Not affected by
+  -SkipPlugins.
 
 .PARAMETER ConanHome
   Conan 2 cache root (default: %USERPROFILE%\.conan2). Source of the FFmpeg /
@@ -121,7 +131,9 @@ param(
     "arrow-parser"
   ),
   [string]$PluginPlatform = "windows-x86_64",
-  [string]$ConanHome  = "$env:USERPROFILE\.conan2",
+  [string[]]$LocalPluginDirs = @((Join-Path $BuildDir "airbound_plugins")),
+  # Same cache Conan uses: CONAN_HOME when set, else the per-user default.
+  [string]$ConanHome  = $(if ($env:CONAN_HOME) { $env:CONAN_HOME } else { "$env:USERPROFILE\.conan2" }),
   [string]$Version    = "",
   [string]$OutDir     = ".",
   [string]$StageDir   = "",
@@ -406,6 +418,46 @@ if ($SkipPlugins) {
   Info "staged $($pluginDlls.Count) plugin DLL(s) from $($PluginIds.Count) registry extension(s)"
 }
 
+# --- stage locally built plugins (in-tree plugins/) ------------------------------
+# Same installed layout as a registry archive: plugins/<id>/{manifest.json,
+# *_plugin.dll}. The manifest is the sidecar pj_configure_plugin writes next to
+# the DLL (the app itself reads the copy embedded in the DLL).
+foreach ($dir in $LocalPluginDirs) {
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+    Die "local plugin directory not found: '$dir'. Build the plugins first, or pass -LocalPluginDirs @() to bundle none."
+  }
+  $localDlls = @(Get-ChildItem -LiteralPath $dir -Filter "*_plugin.dll" -File)
+  if ($localDlls.Count -eq 0) { Die "local plugin directory '$dir' contains no *_plugin.dll" }
+  foreach ($dll in $localDlls) {
+    $sidecar = Join-Path $dll.DirectoryName ($dll.BaseName + ".pjmanifest.json")
+    if (-not (Test-Path -LiteralPath $sidecar)) { Die "local plugin '$($dll.Name)' has no manifest sidecar '$sidecar'" }
+    try {
+      $localManifest = Get-Content -LiteralPath $sidecar -Raw | ConvertFrom-Json
+    } catch {
+      Die "local plugin '$($dll.Name)' has an invalid manifest sidecar: $_"
+    }
+    $id = [string]$localManifest.id
+    $localVersion = [string]$localManifest.version
+    if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') { Die "local plugin '$($dll.Name)' declares an invalid id '$id'" }
+    if (-not $localVersion) { Die "local plugin '$id' has an empty version" }
+    if ($resolvedPluginVersions.ContainsKey($id)) { Die "local plugin '$id' is already bundled (duplicate id)" }
+    $minimumHostVersion = [string]$localManifest.min_plotjuggler_version
+    if ($minimumHostVersion) {
+      $minimumParsed = Convert-Semver $minimumHostVersion "local plugin '$id' minimum PlotJuggler version"
+      if ($minimumParsed -gt (Convert-Semver $Version "installer version")) {
+        Die "local plugin '$id' requires PlotJuggler $minimumHostVersion, but this installer is $Version"
+      }
+    }
+    $destination = Join-Path $stagePlugins $id
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    Copy-Item -LiteralPath $dll.FullName -Destination $destination -Force
+    Copy-Item -LiteralPath $sidecar -Destination (Join-Path $destination "manifest.json") -Force
+    $resolvedPluginVersions[$id] = $localVersion
+    $pluginDlls += Get-Item -LiteralPath (Join-Path $destination $dll.Name)
+    Info "staged local plugin: $id $localVersion from $dir"
+  }
+}
+
 # --- Qt deployment (Qt DLLs + Qt plugins + MSVC runtime) -------------------
 # windeployqt has to be run over the exe AND every plugin DLL: a plugin can
 # pull Qt modules (Qt Charts, Qt SVG, Qt QuickWidgets …) the main exe does
@@ -505,11 +557,12 @@ Copy-CPythonStdlib
 # plugins make the release fail before binarycreator runs.
 if ($pluginDlls.Count -gt 0) {
   $validationArgs = @("--validate-plugins", $stagePlugins)
-  foreach ($id in $PluginIds) {
+  # Registry and local plugins alike: every staged id must load at its version.
+  foreach ($id in ($resolvedPluginVersions.Keys | Sort-Object)) {
     $validationArgs += "--expect-plugin"
     $validationArgs += "$id=$($resolvedPluginVersions[$id])"
   }
-  Info "validating $($PluginIds.Count) whitelisted plugin(s) with the staged app ..."
+  Info "validating $($resolvedPluginVersions.Count) bundled plugin(s) with the staged app ..."
   & $stagedExe @validationArgs
   if ($LASTEXITCODE -ne 0) {
     Die "staged plugin validation failed (exit $LASTEXITCODE)"
