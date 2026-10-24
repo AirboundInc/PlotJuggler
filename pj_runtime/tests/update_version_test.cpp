@@ -61,6 +61,16 @@ TEST(UpdateVersionTest, IsNewerVersionComparesStrictly) {
   EXPECT_FALSE(isNewerVersion("3.998.0", "3.999.0"));  // older
 }
 
+// A fourth component (a fork's own build number) orders equal upstream versions.
+TEST(UpdateVersionTest, IsNewerVersionUsesFourthComponentAsTieBreaker) {
+  EXPECT_TRUE(isNewerVersion("4.0.0.2", "4.0.0.1"));
+  EXPECT_TRUE(isNewerVersion("4.0.0.1", "4.0.0"));
+  EXPECT_FALSE(isNewerVersion("4.0.0.1", "4.0.0.1"));
+  EXPECT_FALSE(isNewerVersion("4.0.0", "4.0.0.1"));
+  EXPECT_TRUE(isNewerVersion("4.0.1", "4.0.0.9"));  // upstream version still dominates
+  EXPECT_FALSE(isNewerVersion("4.0.0.x", "4.0.0.1"));
+}
+
 // A malformed tag (either side) must never be treated as an available update.
 TEST(UpdateVersionTest, IsNewerVersionRejectsUnparseable) {
   EXPECT_FALSE(isNewerVersion("garbage", "3.999.0"));

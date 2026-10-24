@@ -30,8 +30,10 @@ namespace PJ {
 namespace {
 // GitHub's REST endpoint returns the latest published, non-draft,
 // non-prerelease release — so betas never trigger the nag on their own.
-constexpr auto kDefaultReleaseApiUrl = "https://api.github.com/repos/PlotJuggler/PlotJuggler/releases/latest";
-constexpr auto kReleaseTagUrl = "https://github.com/PlotJuggler/PlotJuggler/releases/tag/%1";
+// Airbound fork: check the fork's own releases (tagged <upstream>.<build>, e.g.
+// 4.0.0.1), not upstream's, so a build never offers to "update" to upstream.
+constexpr auto kDefaultReleaseApiUrl = "https://api.github.com/repos/AirboundInc/PlotJuggler/releases/latest";
+constexpr auto kReleaseTagUrl = "https://github.com/AirboundInc/PlotJuggler/releases/tag/%1";
 constexpr auto kPackageName = "plotjuggler4";
 constexpr auto kComponentId = "io.plotjuggler.application";
 constexpr int kTransferTimeoutMs = 15000;

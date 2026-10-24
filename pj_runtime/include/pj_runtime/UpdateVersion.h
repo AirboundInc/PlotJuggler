@@ -25,10 +25,12 @@ namespace PJ {
 // Bespoke rather than Qt's QVersionNumber (which pj_marketplace uses): that type
 // doesn't strip a leading `v`, and the "unparseable → never treated as newer"
 // policy in isNewerVersion() is not something QVersionNumber gives for free.
-inline int versionToComparable(const QString& version) {
+// The dot-separated numeric parts of a version, after stripping a leading `v`
+// and any pre-release / build-metadata suffix. Empty for an empty string.
+inline QStringList numericVersionParts(const QString& version) {
   QString v = version.trimmed();
   if (v.isEmpty()) {
-    return -1;
+    return {};
   }
   if (v.startsWith(QLatin1Char('v')) || v.startsWith(QLatin1Char('V'))) {
     v = v.mid(1);
@@ -46,8 +48,14 @@ inline int versionToComparable(const QString& version) {
   if (cut >= 0) {
     v = v.left(cut);
   }
+  return v.split(QLatin1Char('.'));
+}
 
-  const QStringList parts = v.split(QLatin1Char('.'));
+inline int versionToComparable(const QString& version) {
+  const QStringList parts = numericVersionParts(version);
+  if (parts.isEmpty()) {
+    return -1;
+  }
   int components[3] = {0, 0, 0};
   for (int i = 0; i < 3 && i < parts.size(); ++i) {
     bool ok = false;
@@ -65,16 +73,38 @@ inline int versionToComparable(const QString& version) {
   return components[0] * 1'000'000 + components[1] * 1'000 + components[2];
 }
 
+// The optional fourth component of a downstream build version
+// (`4.0.0.3` -> 3; `4.0.0` -> 0), or -1 when it is not a number. Forks number
+// their own releases on top of the upstream version this way.
+inline int versionBuildNumber(const QString& version) {
+  const QStringList parts = numericVersionParts(version);
+  if (parts.size() < 4) {
+    return 0;
+  }
+  bool ok = false;
+  const int n = parts[3].toInt(&ok);
+  return ok && n >= 0 ? n : -1;
+}
+
 // True only when `candidate` is a strictly newer, parseable version than
 // `current` — both must parse, so an unreadable tag on either side yields false
-// (we never nag on garbage).
+// (we never nag on garbage). An optional fourth component breaks ties between
+// equal major.minor.patch versions.
 inline bool isNewerVersion(const QString& candidate, const QString& current) {
   const int candidate_number = versionToComparable(candidate);
   const int current_number = versionToComparable(current);
   if (candidate_number < 0 || current_number < 0) {
     return false;
   }
-  return candidate_number > current_number;
+  if (candidate_number != current_number) {
+    return candidate_number > current_number;
+  }
+  const int candidate_build = versionBuildNumber(candidate);
+  const int current_build = versionBuildNumber(current);
+  if (candidate_build < 0 || current_build < 0) {
+    return false;
+  }
+  return candidate_build > current_build;
 }
 
 }  // namespace PJ

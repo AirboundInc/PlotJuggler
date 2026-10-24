@@ -45,6 +45,8 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+      # Airbound releases: <upstream version>.<build>, e.g. 4.0.0.1
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write     # softprops/action-gh-release needs write to create/update the Release
@@ -56,7 +58,8 @@ concurrency:
 jobs:
   windows-installer:
     # Match windows-ci.yml and the toolchain used for the published plugin artifacts.
-    runs-on: depot-windows-2022-4
+    # Airbound fork: GitHub-hosted runner (upstream's Depot runners are not available here).
+    runs-on: windows-2022
     # Backstop against hangs — app build plus registry download/validation/packaging.
     # Plugins are not compiled here.
     timeout-minutes: 180

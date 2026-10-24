@@ -184,13 +184,14 @@ TEST(UpdateCheckerTest, SupersededCheckEmitsNothing) {
 }
 
 TEST(UpdateCheckerTest, DefaultUrlTargetsPublicRepo) {
-  // The check must hit the PUBLIC PlotJuggler/PlotJuggler repo: the private
-  // PlotJuggler/PJ4 dev repo is invisible to anonymous clients, so aiming the
-  // default there makes every check fail (403 rate-limit / 404 not-found).
+  // The check must hit a PUBLIC repo — in the Airbound fork, its own
+  // AirboundInc/PlotJuggler releases: the private PlotJuggler/PJ4 dev repo is
+  // invisible to anonymous clients, so aiming the default there makes every
+  // check fail (403 rate-limit / 404 not-found).
   PJ::UpdateChecker checker;
   const std::string url = checker.releaseApiUrl().toString().toStdString();
   EXPECT_NE(url.find("api.github.com"), std::string::npos) << url;
-  EXPECT_NE(url.find("/repos/PlotJuggler/PlotJuggler/releases/latest"), std::string::npos) << url;
+  EXPECT_NE(url.find("/repos/AirboundInc/PlotJuggler/releases/latest"), std::string::npos) << url;
   EXPECT_EQ(url.find("/PlotJuggler/PJ4/"), std::string::npos) << url;
 }
 
