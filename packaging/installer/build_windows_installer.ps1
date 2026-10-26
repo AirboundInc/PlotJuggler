@@ -393,12 +393,15 @@ function Download-RegistryPlugins {
     if ([string]$packageManifest.version -ne $extensionVersion) {
       Die "plugin '$id' archive version '$($packageManifest.version)' does not match registry version '$extensionVersion'"
     }
+    # min_plotjuggler_version is deprecated and the app no longer gates on it
+    # (pj_marketplace/plugin_compatibility.hpp); the staged load below is the
+    # real compatibility check, so a newer floor only warns.
     $minimumHostVersion = [string]$packageManifest.min_plotjuggler_version
     if ($minimumHostVersion) {
       $minimumParsed = Convert-Semver $minimumHostVersion "plugin '$id' minimum PlotJuggler version"
       $hostParsed = Convert-Semver $Version "installer version"
       if ($minimumParsed -gt $hostParsed) {
-        Die "plugin '$id' requires PlotJuggler $minimumHostVersion, but this installer is $Version"
+        Warn "plugin '$id' declares PlotJuggler $minimumHostVersion (deprecated floor), this installer is $Version"
       }
     }
     $resolvedPluginVersions[$id] = $extensionVersion
@@ -445,7 +448,7 @@ foreach ($dir in $LocalPluginDirs) {
     if ($minimumHostVersion) {
       $minimumParsed = Convert-Semver $minimumHostVersion "local plugin '$id' minimum PlotJuggler version"
       if ($minimumParsed -gt (Convert-Semver $Version "installer version")) {
-        Die "local plugin '$id' requires PlotJuggler $minimumHostVersion, but this installer is $Version"
+        Warn "local plugin '$id' declares PlotJuggler $minimumHostVersion (deprecated floor), this installer is $Version"
       }
     }
     $destination = Join-Path $stagePlugins $id
