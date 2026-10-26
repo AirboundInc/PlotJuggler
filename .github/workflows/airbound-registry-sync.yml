@@ -1,0 +1,29 @@
+name: airbound-registry-sync
+
+# Re-merges upstream PlotJuggler's plugin registry into the Airbound registry
+# (the plugin-registry branch, see plugins/registry/README.md), so official
+# plugin updates keep reaching apps that read the Airbound registry.
+
+on:
+  schedule:
+    - cron: '23 3 * * *'   # daily
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push the plugin-registry branch
+
+concurrency:
+  group: airbound-plugin-registry
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Merge upstream's registry
+        env:
+          REGISTRY_COMMIT_MESSAGE: Sync with upstream's plugin registry
+        run: bash plugins/registry/update_registry_branch.sh

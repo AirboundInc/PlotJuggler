@@ -268,9 +268,11 @@ void checkGroupButton(QButtonGroup* group, int id) {
   return is_subpath ? relative : absolute_path;
 }
 
+// Airbound fork: upstream's registry plus the Airbound plugins, kept in sync by
+// .github/workflows/airbound-registry-sync.yml (see plugins/registry/README.md).
 constexpr auto kDefaultRegistryUrl =
-    "https://raw.githubusercontent.com/PlotJuggler/pj-plugin-registry/"
-    "refs/heads/development/registry.json";
+    "https://raw.githubusercontent.com/AirboundInc/PlotJuggler/"
+    "refs/heads/plugin-registry/registry.json";
 constexpr auto kRegistryUrlSettingsKey = "Marketplace/registryUrl";
 constexpr auto kPanelBottomExpandedKey = "MainWindow.panelBottomExpandedHeight";
 // Minimum height (px) of the Source Timeline strip when the bottom panel is open

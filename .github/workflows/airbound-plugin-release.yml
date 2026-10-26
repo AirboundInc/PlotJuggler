@@ -1,0 +1,103 @@
+name: airbound-plugin-release
+
+# Releases one in-tree Airbound plugin (plugins/<folder>) to the Airbound plugin
+# registry, see plugins/registry/README.md.
+#
+# Tag push `<folder>/v<version>` (e.g. data_load_apbin/v0.1.1, the official
+# plugins' tag style): build the Windows ZIP, attach it to a GitHub Release for
+# the tag and add it to the registry. The tag's version must equal the version
+# in plugins/<folder>/manifest.json.
+#
+# Manual run: build and upload the ZIP as a workflow artifact only, for a
+# dry run of a release.
+
+on:
+  push:
+    tags:
+      - '*/v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin folder under plugins/ (e.g. data_load_apbin)
+        required: true
+        type: string
+
+permissions:
+  contents: write   # create the Release and push the plugin-registry branch
+
+# One registry writer at a time (shared with airbound-registry-sync.yml).
+concurrency:
+  group: airbound-plugin-registry
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve plugin
+        id: plugin
+        shell: pwsh
+        env:
+          INPUT_PLUGIN: ${{ inputs.plugin }}
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $folder, $tagVersion = $env:GITHUB_REF_NAME -split '/v', 2
+          } else {
+            $folder = $env:INPUT_PLUGIN
+            $tagVersion = ''
+          }
+          $manifestPath = "plugins/$folder/manifest.json"
+          if ($folder -notmatch '^[A-Za-z0-9_.-]+$' -or -not (Test-Path $manifestPath)) {
+            throw "No plugin folder plugins/$folder with a manifest.json"
+          }
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if ($tagVersion -and $tagVersion -ne $manifest.version) {
+            throw "Tag version $tagVersion does not match plugins/$folder/manifest.json version $($manifest.version)"
+          }
+          "folder=$folder" >> $env:GITHUB_OUTPUT
+
+      - uses: conan-io/setup-conan@v1
+        with:
+          cache_packages: false
+
+      - name: Install cmake and ninja
+        run: pip install cmake "ninja!=1.13.0"
+
+      - name: Build and package
+        id: build
+        shell: pwsh
+        run: ./plugins/registry/build_plugin.ps1 -Plugin ${{ steps.plugin.outputs.folder }} -OutDir dist
+
+      - name: Upload the archive (manual run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.zip_name }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Attach the archive to the GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ steps.build.outputs.id }} ${{ steps.build.outputs.version }}
+          files: dist/*.zip
+          fail_on_unmatched_files: true
+          # Plugin releases must never become the repository's "latest" release:
+          # the app's update check reads releases/latest for app versions.
+          make_latest: false
+
+      - name: Add it to the plugin registry
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          REGISTRY_COMMIT_MESSAGE: Release ${{ steps.build.outputs.id }} ${{ steps.build.outputs.version }}
+        run: |
+          bash plugins/registry/update_registry_branch.sh set-entry \
+            --manifest "plugins/${{ steps.plugin.outputs.folder }}/manifest.json" \
+            --platform windows-x86_64 \
+            --url "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.build.outputs.zip_name }}" \
+            --sha256 "${{ steps.build.outputs.sha256 }}"
