@@ -560,6 +560,28 @@ TEST(TransformService, ActiveTapMakesIncrementalDrainAZeroResolveNoOp) {
   EXPECT_TRUE(resolves(*service.transformBuffer(1), "f0", "f1", 100));
 }
 
+// A data source that pushes serialized canonical FrameTransforms (no parser) never
+// passes the ingest tap, which only sees parser-routed bytes. With the tap active,
+// the post-load publish and live ingest must still drain those topics, or their
+// frames never reach the buffer.
+TEST(TransformService, ActiveTapStillIngestsCanonicalTopics) {
+  PJ::SessionManager session;
+  PJ::ObjectStore& store = session.objectStore();
+  const auto topic = registerCanonicalTfTopic(store, /*dataset_id=*/1, "_TF");
+  ASSERT_TRUE(store.pushOwned(topic, 100, canonicalEdgePayload("world", "vehicle", 100)).has_value());
+
+  TransformService service(session);
+  service.activateIngestTap();
+  service.publishTransforms(/*dataset_id=*/1);
+  EXPECT_TRUE(resolves(*service.transformBuffer(1), "world", "vehicle", 100))
+      << "a canonical TF topic must be ingested on publish even with the tap active";
+
+  // Later entries arrive through the same incremental path.
+  ASSERT_TRUE(store.pushOwned(topic, 200, canonicalEdgePayload("vehicle", "sensor", 200)).has_value());
+  EXPECT_TRUE(service.ingestNewTransforms(/*dataset_id=*/1));
+  EXPECT_TRUE(resolves(*service.transformBuffer(1), "world", "sensor", 200));
+}
+
 TEST(TransformService, ExplicitRebuildWithTapActiveMatchesTapBuiltBuffer) {
   PJ::SessionManager session;
   const auto topic = registerMockTfTopic(session, /*dataset_id=*/1, "/tf");

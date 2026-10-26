@@ -1063,6 +1063,12 @@ topic's current `SessionManager` parser binding, decodes under `parseLocked`, fo
 validated edges into the dataset's thread-safe `TransformBuffer`, and returns before
 the source payload anchor can expire. This is the normal file and streaming TF path.
 
+The tap only sees parser-routed bytes. A data source or toolbox that pushes
+serialized canonical `FrameTransforms` straight into the `ObjectStore` (no parser,
+`builtin_object_type` metadata) never passes it, so `ingestNewTransforms` /
+`publishTransforms` still drain those parser-less topics from the store while the
+tap is active, and skip only the parser-backed topics the tap already fed.
+
 Progressive file-load flushes emit `datasetTransformsReady` so docks re-read frame
 hierarchies at the current playhead; the flush does not decode TF. Streaming keeps
 the existing `samplesIngested` connection:
@@ -1072,9 +1078,10 @@ the existing `samplesIngested` connection:
   (fired on the UI thread after each retention trim, `live == true` only while
   following a live stream; file load emits `live == false` and is served by the
   loader-driven `datasetTransformsReady` publication described above).
-- On each live tick, `TransformService::ingestNewTransforms` is a no-op while the
-  tap is active. `recomputeOrphanStates(force=false)` observes the buffer revision
-  written by the worker.
+- On each live tick, `TransformService::ingestNewTransforms` drains only parser-less
+  canonical TF topics while the tap is active (parser-backed ones are tap-fed).
+  `recomputeOrphanStates(force=false)` observes the buffer revision written by the
+  worker.
 - `driveVisibleLayersToLiveEdge` then queries each visible layer's `timeRange()`
   for the newest timestamp now in the `ObjectStore` and drives `setTrackerTime`
   on every visible layer (consulting the *layer's* range, not the store's per

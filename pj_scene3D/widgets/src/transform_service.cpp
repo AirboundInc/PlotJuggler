@@ -369,10 +369,9 @@ void TransformService::publishTransforms(PJ::DatasetId dataset_id) {
 
 bool TransformService::ingestNewTransforms(PJ::DatasetId dataset_id) {
   Q_ASSERT(QThread::currentThread() == thread());
-  if (tap_active_) {
-    return false;
-  }
-  return ingestNewerThanCursor(dataset_id);
+  // The tap only sees parser-routed bytes; canonical topics pushed by a data
+  // source or toolbox (serialized FrameTransforms, no parser) must be drained here.
+  return ingestNewerThanCursor(dataset_id, /*canonical_only=*/tap_active_);
 }
 
 void TransformService::ingestTappedObject(
@@ -387,7 +386,7 @@ void TransformService::ingestTappedObject(
   warnDroppedEdges("ingest tap", dataset_id, stats);
 }
 
-bool TransformService::ingestNewerThanCursor(PJ::DatasetId dataset_id) {
+bool TransformService::ingestNewerThanCursor(PJ::DatasetId dataset_id, bool canonical_only) {
   Q_ASSERT(QThread::currentThread() == thread());
   PJ::ObjectStore& object_store = session_.objectStore();
   auto tf_buffer = transformBuffer(dataset_id);
@@ -403,6 +402,9 @@ bool TransformService::ingestNewerThanCursor(PJ::DatasetId dataset_id) {
       continue;  // nothing to classify/ingest yet; retry on a later tick
     }
     const auto parser_binding = session_.parserBindingForObjectTopic(topic_id);
+    if (canonical_only && parser_binding) {
+      continue;  // fed by the ingest tap; draining it too would ingest twice
+    }
 
     auto cursor_it = tf_cursors_.find(key);
     if (cursor_it == tf_cursors_.end()) {

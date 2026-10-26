@@ -66,8 +66,8 @@ class TransformService : public QObject {
   // history.
   void ingestFrameTransformsForDataset(PJ::DatasetId dataset_id);
 
-  /// Drains any store entries the tap did not feed (no-op with the tap active),
-  /// then signals docks.
+  /// Drains any store entries the tap did not feed (with the tap active, only
+  /// canonical parser-less topics), then signals docks.
   void publishTransforms(PJ::DatasetId dataset_id);
 
   // Bound the dataset's TransformBuffer to a rolling cache window so a
@@ -124,9 +124,10 @@ class TransformService : public QObject {
   // GUI-thread only.
   [[nodiscard]] QString rememberedFixedFrame(PJ::DatasetId dataset_id);
 
-  // Incremental, UID-keyed ObjectStore ingest for a service with no active tap.
-  // With the tap active this returns false immediately because the pushing worker
-  // already updated the buffer. GUI-thread only.
+  // Incremental, UID-keyed ObjectStore ingest. With the tap active, parser-backed
+  // topics are skipped because the pushing worker already updated the buffer;
+  // canonical (parser-less) topics never pass the tap, so they are still drained
+  // here. GUI-thread only.
   //
   // The bool reports whether THIS call applied any transforms — NOT a reliable
   // "something changed" signal for repaint gating: the per-topic cursor is
@@ -144,7 +145,8 @@ class TransformService : public QObject {
  private:
   // For every TF topic, drain entries since the per-topic UID cursor and ingest
   // them. GUI-thread only. Returns true if any transform was applied.
-  bool ingestNewerThanCursor(PJ::DatasetId dataset_id);
+  // `canonical_only` skips parser-backed topics (the ones the tap feeds).
+  bool ingestNewerThanCursor(PJ::DatasetId dataset_id, bool canonical_only = false);
 
   // Worker-thread callback registered by activateIngestTap. Parser bindings are
   // resolved per call, and no payload bytes survive its return.
