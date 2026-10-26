@@ -1,0 +1,34 @@
+{
+  "extensions": [
+    {
+      "id": "airbound-apbin-loader",
+      "name": "ArduPilot Bin",
+      "version": "0.1.0",
+      "description": "Data loader for ArduPilot DataFlash (.bin) logs. Ported from the Airbound PlotJuggler 3 fork of ArduPilot/plotjuggler-apbin-plugins.",
+      "author": "Pierre Kancir, Jonas Withelm, Airbound",
+      "publisher": "Airbound",
+      "website": "https://github.com/AirboundInc/PlotJuggler",
+      "repository": "https://github.com/AirboundInc/PlotJuggler",
+      "license": "LGPL-3.0",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "ardupilot",
+        "dataflash",
+        "bin",
+        "file",
+        "loader",
+        "drone",
+        "flight"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.32.0",
+      "platforms": {
+        "windows-x86_64": {
+          "url": "https://github.com/AirboundInc/PlotJuggler/releases/download/data_load_apbin/v0.1.0/airbound-apbin-loader-0.1.0-windows-x64.zip",
+          "checksum": "sha256:adc173360d770ae2144ac2afbea1081b0b04e2283b45a2b7117736ad8bb1c786"
+        }
+      }
+    }
+  ]
+}

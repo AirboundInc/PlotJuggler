@@ -1,0 +1,1332 @@
+{
+  "registry_version": 1.0,
+  "extensions": [
+    {
+      "id": "arrow-parser",
+      "name": "Arrow IPC Parser",
+      "version": "1.0.0",
+      "description": "Message parser for self-describing Arrow IPC streams.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "arrow",
+        "ipc",
+        "parser"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_arrow/v1.0.0/arrow-parser-1.0.0-linux-aarch64.zip",
+          "checksum": "sha256:95fe6bcd40c5361fe6991349fc752b51d7de17b97cb83d9a71b0a7590249dbcb"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_arrow/v1.0.0/arrow-parser-1.0.0-linux-x86_64.zip",
+          "checksum": "sha256:c87a2a1883af8125ca3420955d05cf38024dcedf4173fbf11d0a907e12af44f1"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_arrow/v1.0.0/arrow-parser-1.0.0-macos-arm64.zip",
+          "checksum": "sha256:31b92c5653465c3563297c55ff93317142509fb17d3fd38e2f9df26217fbf28e"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_arrow/v1.0.0/arrow-parser-1.0.0-windows-arm64.zip",
+          "checksum": "sha256:ee91fefefde8fc16a9ea747493b5ccdc34e029ece78324fdd6d1647fc6a74818"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_arrow/v1.0.0/arrow-parser-1.0.0-windows-x64.zip",
+          "checksum": "sha256:0f08c82ef1527207c3a174305e7ce464c6a62880f170f52f72a9e8b69e3b52fa"
+        }
+      }
+    },
+    {
+      "id": "blf-loader",
+      "name": "BLF Loader",
+      "version": "0.1.1",
+      "description": "Data loader for Vector BLF (Binary Logging Format) CAN logs, decoded to signals via DBC.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "blf",
+        "vector",
+        "can",
+        "automotive",
+        "file",
+        "loader"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.1/blf-loader-0.1.1-linux-aarch64.zip",
+          "checksum": "sha256:c98d30f69988586cbe0edf2b924c057381beec1f0101bb214b2fcc5d3da22286"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.1/blf-loader-0.1.1-linux-x86_64.zip",
+          "checksum": "sha256:d8ff0d12d138ccd0acb04aab72b3c72737ff7a21bd22dcac06f0464025f242ba"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.1/blf-loader-0.1.1-macos-arm64.zip",
+          "checksum": "sha256:0a27cfa658ee13c22d98357004a90f351d57a357cfcb807453614de3cdd7aaa6"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.1/blf-loader-0.1.1-windows-arm64.zip",
+          "checksum": "sha256:73b4b8583c97f65dcad7c060ab600397f1cfa67abd87cace41a983674703297e"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.1/blf-loader-0.1.1-windows-x64.zip",
+          "checksum": "sha256:db11238df7214642f9a358b3721d614adaac52769bc42a7e662052188edc6cc9"
+        }
+      }
+    },
+    {
+      "id": "csv-loader",
+      "name": "CSV Loader",
+      "version": "1.0.7",
+      "description": "Data loader for CSV files.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "csv",
+        "file",
+        "loader"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.7/csv-loader-1.0.7-linux-aarch64.zip",
+          "checksum": "sha256:0f75521c438b1624fa7299c3d9dad226da06aae9d6b3f47668712a1928d0b670"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.7/csv-loader-1.0.7-linux-x86_64.zip",
+          "checksum": "sha256:d7840de6827b57c7cdcfc8a10b00fa5c4defc176f75c94c8c940896aecc026d9"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.7/csv-loader-1.0.7-macos-arm64.zip",
+          "checksum": "sha256:3cb3af50408150e97a7da228ff3c498dcd1c9c6e0648dc093f1acfdab75bc1c8"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.7/csv-loader-1.0.7-windows-arm64.zip",
+          "checksum": "sha256:cd91f4d7bbda55a141aad0eac708212c48afd60e529b823728974a5ac5057d30"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.7/csv-loader-1.0.7-windows-x64.zip",
+          "checksum": "sha256:d92c99015c912ee7afafa7771b487a6f561be734ddcc6448a02cfc1b81441151"
+        }
+      }
+    },
+    {
+      "id": "data-tamer-parser",
+      "name": "DataTamer Parser",
+      "version": "0.9.2",
+      "description": "Message parser for DataTamer encoded data. Efficient serialization for robotics.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "data_tamer",
+        "parser",
+        "robotics",
+        "serialization"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_data_tamer/v0.9.2/data-tamer-parser-0.9.2-linux-aarch64.zip",
+          "checksum": "sha256:da07cbec80d111cfff0bf0b5e7be68ca583eb1c015a898ffe75c130f922d357a"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_data_tamer/v0.9.2/data-tamer-parser-0.9.2-linux-x86_64.zip",
+          "checksum": "sha256:c49bb6d43ea7f010df26d47358f32c22389f0b05db1366054d7d4e758eb625ab"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_data_tamer/v0.9.2/data-tamer-parser-0.9.2-macos-arm64.zip",
+          "checksum": "sha256:14cc23e29db216c6b06fac5092bcab64b1fd29391745a46683cb772671a48ca1"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_data_tamer/v0.9.2/data-tamer-parser-0.9.2-windows-arm64.zip",
+          "checksum": "sha256:837a2ced02aee72cfb3992145c21bcdeb7ab6c3a8b2becfb0693cb82014d2d31"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_data_tamer/v0.9.2/data-tamer-parser-0.9.2-windows-x64.zip",
+          "checksum": "sha256:771f91ef6fe72a61ef82cdbc13ddcd1dac34c595bad1a359e77d81bb2eb6c0cf"
+        }
+      }
+    },
+    {
+      "id": "dummy-streamer",
+      "name": "Dummy Streamer",
+      "version": "1.0.1",
+      "description": "Generates synthetic sine, cosine, sawtooth, and noise signals for testing and demonstration.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "dummy",
+        "test",
+        "synthetic",
+        "demo",
+        "stream"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_dummy/v1.0.1/dummy-streamer-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:a5173cc89d35a1dad8ded48c30e3a6e2c0e97fb90546968765aeac6077bb869c"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_dummy/v1.0.1/dummy-streamer-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:a2fa3f486ae2440d0bec0c9888d48f32584b26cd32a720286a92afb3b50970a2"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_dummy/v1.0.1/dummy-streamer-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:8a1876352d44f1dbf136a31e41f69ece83bbac75f766d397501c7e4f3e748d33"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_dummy/v1.0.1/dummy-streamer-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:b277b16841418a982a9e41ba14fbac13e4fff01788379dcf4bbd27bbc781bac9"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_dummy/v1.0.1/dummy-streamer-1.0.1-windows-x64.zip",
+          "checksum": "sha256:920c9143dacec2817908b69075c37cc4535da29d1a1b220411c8cd24447ea375"
+        }
+      }
+    },
+    {
+      "id": "foxglove-bridge",
+      "name": "Foxglove Bridge",
+      "version": "1.1.0",
+      "description": "Connect to Foxglove WebSocket server for ROS data streaming. Compatible with Foxglove Studio.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "foxglove",
+        "bridge",
+        "stream",
+        "ros",
+        "websocket"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_foxglove_bridge/v1.1.0/foxglove-bridge-1.1.0-linux-aarch64.zip",
+          "checksum": "sha256:f3c35d5569d8d5b033459c829c693e774e4f5cc63d11108602272837883d996c"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_foxglove_bridge/v1.1.0/foxglove-bridge-1.1.0-linux-x86_64.zip",
+          "checksum": "sha256:fe57f5a982d4bb34364b23af9672de77c70ec99e391629cd280db0bb95cd30ac"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_foxglove_bridge/v1.1.0/foxglove-bridge-1.1.0-macos-arm64.zip",
+          "checksum": "sha256:ef802a725af2b7572a59c27d1cfcf3d6607b6aa6f9ff250b894df66a005a1ce1"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_foxglove_bridge/v1.1.0/foxglove-bridge-1.1.0-windows-arm64.zip",
+          "checksum": "sha256:a5f48b093f382b8e231087cba6a11eb8870ef84bea321711519dfb396290d393"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_foxglove_bridge/v1.1.0/foxglove-bridge-1.1.0-windows-x64.zip",
+          "checksum": "sha256:6c655bf9043a5485387773b7071419092fea96157780686d71290969cf9b6066"
+        }
+      }
+    },
+    {
+      "id": "json-parser",
+      "name": "JSON Parser",
+      "version": "1.3.0",
+      "description": "Message parser for JSON, CBOR, MessagePack, and BSON encoded data.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "json",
+        "cbor",
+        "msgpack",
+        "bson",
+        "parser"
+      ],
+      "min_plotjuggler_version": "4.0.1",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_json/v1.3.0/json-parser-1.3.0-linux-aarch64.zip",
+          "checksum": "sha256:b61a08b87a3f4910ef556a3f84bbd96d91bc93d9b7a2fec1686fde596240d8b4"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_json/v1.3.0/json-parser-1.3.0-linux-x86_64.zip",
+          "checksum": "sha256:f13a4732a3d0631fa630107fdd9a824d2b7b5a1f9e68e6c3d6ffdc64c9d7c9c1"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_json/v1.3.0/json-parser-1.3.0-macos-arm64.zip",
+          "checksum": "sha256:9ed2a807eb7e764c0d186ab3e460e1e2066ee0f6ddfb90cf00da68725304c71c"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_json/v1.3.0/json-parser-1.3.0-windows-arm64.zip",
+          "checksum": "sha256:c72e5ca9de67fff33f2937379bd60340c486c026f5ebc9f5730fec15e35a982f"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_json/v1.3.0/json-parser-1.3.0-windows-x64.zip",
+          "checksum": "sha256:fb3f10b88a853106ffcfd0eed716e45b3f347d45b07df091ef9611183b93403e"
+        }
+      }
+    },
+    {
+      "id": "lerobot-loader",
+      "name": "LeRobot Loader",
+      "version": "1.0.2",
+      "description": "Data loader for LeRobot v2.x and v3.0 datasets: flattened numeric series + per-camera video on a shared timeline. v3.0 datasets use a consolidated per-shard Parquet/MP4 layout with relational metadata; the plugin reads meta/episodes/*.parquet to resolve each episode's row range and clip window.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "lerobot",
+        "robotics",
+        "parquet",
+        "video",
+        "loader"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.2/lerobot-loader-1.0.2-linux-aarch64.zip",
+          "checksum": "sha256:f949ac50ec235befd4d0eedbb2c1de0d5676d002f63b63f00de27792a8bed624"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.2/lerobot-loader-1.0.2-linux-x86_64.zip",
+          "checksum": "sha256:81a97ff350b02f46e03b67bcec3fcef9c24f58d199a67c9f31d972401ea0afdc"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.2/lerobot-loader-1.0.2-macos-arm64.zip",
+          "checksum": "sha256:3671129f543279d9480af7b3c5498eb4e01ecdcd17a39a4dd05ac2658af25c61"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.2/lerobot-loader-1.0.2-windows-arm64.zip",
+          "checksum": "sha256:730ac766b17e2ef4fdd2285d48ada1d5bf33ab4eb2592e95c61c3753c72a5500"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.2/lerobot-loader-1.0.2-windows-x64.zip",
+          "checksum": "sha256:74bd428a70e124ef903780ca10bdc5044da398302628b50bb0339611ed986559"
+        }
+      }
+    },
+    {
+      "id": "lsl-streaming",
+      "name": "Lab Streaming Layer",
+      "version": "0.9.2",
+      "description": "Real-time streaming from Lab Streaming Layer (LSL) sources, including numeric and marker (string) streams.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "lsl",
+        "lab streaming layer",
+        "stream",
+        "realtime",
+        "eeg",
+        "biosignals"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_lsl/v0.9.2/lsl-streaming-0.9.2-linux-aarch64.zip",
+          "checksum": "sha256:b5bd5cf4468d3a96b0c814bcce478e579469ce405d940f3a441abe1a2431facd"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_lsl/v0.9.2/lsl-streaming-0.9.2-linux-x86_64.zip",
+          "checksum": "sha256:b8b5ecf440a48c2f7654bba83e8f8146b8249646098a64b4e161a18764d0892f"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_lsl/v0.9.2/lsl-streaming-0.9.2-macos-arm64.zip",
+          "checksum": "sha256:ee813cc1bf2a00fd6b72615ef269ca0486c8165064979f9c83a32d45c6af0948"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_lsl/v0.9.2/lsl-streaming-0.9.2-windows-arm64.zip",
+          "checksum": "sha256:e9cfa8f36e4ba30b2dcbf6a85944c65c8821a12e1f0c66b0aeed6ba26ceca5d2"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_lsl/v0.9.2/lsl-streaming-0.9.2-windows-x64.zip",
+          "checksum": "sha256:4f7a1129d247e4097cc3fab8fce2a5bafe59071bda9e85b828d3c4f110455d2a"
+        }
+      }
+    },
+    {
+      "id": "mcap-loader",
+      "name": "MCAP Loader",
+      "version": "1.3.0",
+      "description": "Data loader for MCAP files and split ROS 2 bags (metadata.yaml). Supports ROS1, ROS2, Protobuf, and JSON message encodings.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "mcap",
+        "file",
+        "loader",
+        "ros",
+        "ros2",
+        "protobuf"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "suggested_sdk_version": "0.32.0",
+      "floor_test": "McapDatasetMetadata.MetadataPublishDegradesCleanlyOnFloorLevelHost",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.0/mcap-loader-1.3.0-linux-aarch64.zip",
+          "checksum": "sha256:a2e236bc20e6f0e2480b1fdb1789b69882ac8bafba3e1ec188cf5c8bc39a35d8"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.0/mcap-loader-1.3.0-linux-x86_64.zip",
+          "checksum": "sha256:d58dc3ab1af06783d8bf0ce3a488b18ff480ac3fbea4f6e2425d30230eee4038"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.0/mcap-loader-1.3.0-macos-arm64.zip",
+          "checksum": "sha256:fb86473e651a191192a6d38f1fd8208e01535c1335a5f23e5fff4afcf04ec37d"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.0/mcap-loader-1.3.0-windows-arm64.zip",
+          "checksum": "sha256:4b694e8c84ab9ea6bec44a68b501bf06282bccdd4cfaa2ee29df6c2b0c39adc1"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.0/mcap-loader-1.3.0-windows-x64.zip",
+          "checksum": "sha256:a366ef8de0b36a705d5edaa4ea1f08c03fb2e183fa9d51184330ad550e6e84ea"
+        }
+      }
+    },
+    {
+      "id": "mf4-loader",
+      "name": "MF4/MDF Loader",
+      "version": "0.1.1",
+      "description": "Data loader for ASAM MDF / MF4 measurement files (automotive, CAN/LIN bus logging).",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "mf4",
+        "mdf",
+        "asam",
+        "file",
+        "loader",
+        "can",
+        "automotive"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.1/mf4-loader-0.1.1-linux-aarch64.zip",
+          "checksum": "sha256:291f2369a6c65ccfc686af352abc18cd590f22317bc386987803d3d2e59efc86"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.1/mf4-loader-0.1.1-linux-x86_64.zip",
+          "checksum": "sha256:7515b224beadff87eb1915c2d64d2abc6e7ddb711594957832fe82ff64955680"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.1/mf4-loader-0.1.1-macos-arm64.zip",
+          "checksum": "sha256:8ef9a4420b6dbac2dbd8f18744d895efc3f29d068ed94eb3198aefec97cd231f"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.1/mf4-loader-0.1.1-windows-arm64.zip",
+          "checksum": "sha256:407ca831c82b6e20fc058f4481273dc804df93670bebe7b5fd1cf008b4fedf52"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.1/mf4-loader-0.1.1-windows-x64.zip",
+          "checksum": "sha256:bd4e9fc298082307feeab188ff794b3b94a9b94f8d5e1c9a6af4b6d04809559a"
+        }
+      }
+    },
+    {
+      "id": "mp4-loader",
+      "name": "MP4 Loader",
+      "version": "0.10.0",
+      "description": "Data loader for .mp4 video files. Reads the container's creation_time tag (when present) so the host can anchor the video on a wall-clock timeline; supports multi-file selection via the standard File dialog.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "mp4",
+        "video",
+        "loader"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.31.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.0/mp4-loader-0.10.0-linux-aarch64.zip",
+          "checksum": "sha256:870dadf31b0dccc75abd8291be01d91d5e912f39b4868f4ec922d1a452c739af"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.0/mp4-loader-0.10.0-linux-x86_64.zip",
+          "checksum": "sha256:468edbd97d03d6160a77a7a349cbb0cad2dc3fabeec1a2359fee581d63fb126a"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.0/mp4-loader-0.10.0-macos-arm64.zip",
+          "checksum": "sha256:1e065da5b27db97a13437230ffbc373ce11897c462d16056764a2960905a98da"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.0/mp4-loader-0.10.0-windows-arm64.zip",
+          "checksum": "sha256:4421afd65b963ad8106e2b4ea014f000b0cf967fd9c68ed2c01199325848595f"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.0/mp4-loader-0.10.0-windows-x64.zip",
+          "checksum": "sha256:468e98a0d1f372cee5ed900b351685ee7b60a65c5bc2dd456d288a3f811b8970"
+        }
+      }
+    },
+    {
+      "id": "mqtt-subscriber",
+      "name": "MQTT Subscriber",
+      "version": "0.9.1",
+      "description": "Real-time data streaming via MQTT protocol. Subscribe to topics and visualize live data.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "mqtt",
+        "stream",
+        "realtime",
+        "iot",
+        "subscriber"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_mqtt/v0.9.1/mqtt-subscriber-0.9.1-linux-aarch64.zip",
+          "checksum": "sha256:3c7108f465912f3d033a8d5226ca16b72e3c3036e8fd727e4c1db98069143a30"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_mqtt/v0.9.1/mqtt-subscriber-0.9.1-linux-x86_64.zip",
+          "checksum": "sha256:512e3a6b05302e8096ee0ddc46afb7c27deae1bb48c02a710f4ef3d9071c9f0f"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_mqtt/v0.9.1/mqtt-subscriber-0.9.1-macos-arm64.zip",
+          "checksum": "sha256:a34d0e105862ff4c1aef26f847c7739d9b1f7514387364bf4adfee2b72c9439d"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_mqtt/v0.9.1/mqtt-subscriber-0.9.1-windows-arm64.zip",
+          "checksum": "sha256:200a5b1eaa9a7f7dacdfd631d1796fe683ee5461a0085291ebcd3fc578c23715"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_mqtt/v0.9.1/mqtt-subscriber-0.9.1-windows-x64.zip",
+          "checksum": "sha256:e63d9eed710dbcc8daa1118c619f165eed92b332e18b1d935e793aeab74bf6b5"
+        }
+      }
+    },
+    {
+      "id": "parquet-loader",
+      "name": "Parquet Loader",
+      "version": "1.0.2",
+      "description": "Data loader for Apache Parquet files. Efficient columnar storage format.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "parquet",
+        "file",
+        "loader",
+        "columnar",
+        "arrow"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.2/parquet-loader-1.0.2-linux-aarch64.zip",
+          "checksum": "sha256:aefa2603025446b2a2507aabce054a005e2258d57994f4b5415127d8f5c2b198"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.2/parquet-loader-1.0.2-linux-x86_64.zip",
+          "checksum": "sha256:2ac26d5c6d2950595a56579fb9ad4059dec9e2b89598fdc1415e7aa0c4773264"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.2/parquet-loader-1.0.2-macos-arm64.zip",
+          "checksum": "sha256:7e9c1b21d98977cef08c00c45b34e61217ef5808a7fd7f36494533b077afc044"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.2/parquet-loader-1.0.2-windows-arm64.zip",
+          "checksum": "sha256:d54a70824d8304904b9ac750318f7d614c931e631356dace7f126622a6b6f457"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.2/parquet-loader-1.0.2-windows-x64.zip",
+          "checksum": "sha256:277565c89f5ae04da5d3f6f9124260b029e0099cb21f7334b8dbc8d1615700ba"
+        }
+      }
+    },
+    {
+      "id": "plotjuggler-bridge",
+      "name": "PlotJuggler Bridge",
+      "version": "1.0.1",
+      "description": "Connect to PlotJuggler Bridge server for generic data streaming over WebSocket.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "bridge",
+        "stream",
+        "websocket",
+        "realtime"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.0.1/plotjuggler-bridge-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:06aa074810e7510a6bc62b966d88065a6e7095411c6ceea310c5d4375ee075af"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.0.1/plotjuggler-bridge-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:9d383e8687f622ce6782631038b4d137dc60cf99c4c6a5ad23246d0954a88c70"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.0.1/plotjuggler-bridge-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:80762b8ed0d46fba686e4b9b69b8353eaf23339a0d79a255d3afa9bb291253b7"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.0.1/plotjuggler-bridge-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:6ea8e6b1a1f3901492c08b814805eecd5f3fe5b3c3560c0b111674a390840834"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.0.1/plotjuggler-bridge-1.0.1-windows-x64.zip",
+          "checksum": "sha256:d46867659bc2a37cb8f6bdf573819111aa5b1b184db64356dabf195c37bc406c"
+        }
+      }
+    },
+    {
+      "id": "pointcloud-3d-loader",
+      "name": "3D Loader (PLY/PCD)",
+      "version": "1.0.1",
+      "description": "Data loader for static 3D files: .pcd and vertex-only .ply load as a point cloud; .ply with faces loads as a 3D mesh. One snapshot at timestamp 0.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "ply",
+        "pcd",
+        "pointcloud",
+        "mesh",
+        "3d",
+        "loader"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.0.1/pointcloud-3d-loader-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:9c75310e55efb0a13c7387151acab8d60404575a57d8ec34fb934de6421619cf"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.0.1/pointcloud-3d-loader-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:4ca6918f23ed202dc3a928a95e0cb83d06a544633d3dba9f9b6f7a0b79fd9674"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.0.1/pointcloud-3d-loader-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:04c912c9cce52f44aa177ae5e809241b67199dbacb431df7b0bf67b4ff4b8803"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.0.1/pointcloud-3d-loader-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:5eaf200c47042a276ec4e513893ffe063d823ad2d9813214425e863030e54b45"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.0.1/pointcloud-3d-loader-1.0.1-windows-x64.zip",
+          "checksum": "sha256:9499124127dd5bb48a80455ae40875bab2280591d7f8673f6e770f19e1239491"
+        }
+      }
+    },
+    {
+      "id": "protobuf-parser",
+      "name": "Protobuf Parser",
+      "version": "1.2.0",
+      "description": "Message parser for Protocol Buffers encoded data. Promotes the well-known Foxglove schemas (PointCloud, CompressedVideo, CompressedImage, RawImage, ImageAnnotations, SceneUpdate, FrameTransform, PosesInFrame, CameraCalibration, VoxelGrid, Grid) to builtin scene objects.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "protobuf",
+        "proto",
+        "parser",
+        "schema",
+        "foxglove",
+        "pointcloud",
+        "image",
+        "scene",
+        "markers",
+        "transforms"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.2.0/protobuf-parser-1.2.0-linux-aarch64.zip",
+          "checksum": "sha256:374caec59a229f9c200d901880fe565bcac1d2d19fcd9b60c4708acb9e5b1f93"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.2.0/protobuf-parser-1.2.0-linux-x86_64.zip",
+          "checksum": "sha256:eff71b76bf470adb7673db75b8651ffea1e9ab6bc1c5162ce511b6f0b3f6ee95"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.2.0/protobuf-parser-1.2.0-macos-arm64.zip",
+          "checksum": "sha256:c057af7bc7f708182e8be8577ba9fa3dcec897552f0579df74bef379ce7ef4aa"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.2.0/protobuf-parser-1.2.0-windows-arm64.zip",
+          "checksum": "sha256:766879e5ae4d15b0b7de9c832e07a6211bc22aec4c01ab7cd3201214e2e70704"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.2.0/protobuf-parser-1.2.0-windows-x64.zip",
+          "checksum": "sha256:eef2c222dd9553d9d7809409e862f126c246f07f20b434b7e4a911875c6b62c9"
+        }
+      }
+    },
+    {
+      "id": "ros-parser",
+      "name": "ROS CDR Parser",
+      "version": "1.2.5",
+      "description": "Message parser for ROS1 and ROS2 messages (ros1msg, ros2msg, omgidl). Promotes common sensor and visualization messages (Image, PointCloud2, OccupancyGrid, GridMap, TF, Markers, and yolo_msgs/DetectionArray to ImageAnnotations) to builtin scene objects.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "ros",
+        "ros1",
+        "ros2",
+        "idl",
+        "parser",
+        "robotics",
+        "yolo",
+        "detection",
+        "annotations"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.2.5/ros-parser-1.2.5-linux-aarch64.zip",
+          "checksum": "sha256:323e2fe284b28b98760eb85761971cb975a247cb64c6ffc9a04bd488b9490e81"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.2.5/ros-parser-1.2.5-linux-x86_64.zip",
+          "checksum": "sha256:15a94cdd50dc6dea83ef8727b62e169059573a28f0f8a733e4d8ef54b65f7b97"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.2.5/ros-parser-1.2.5-macos-arm64.zip",
+          "checksum": "sha256:9ee7707c0ff2480a097bd348644cdfbe72794a612135e6c24e26e2f5a124c4e2"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.2.5/ros-parser-1.2.5-windows-arm64.zip",
+          "checksum": "sha256:5b8bf0e616dfbe33f136c53385766e112d25911b14d37926dd50af4dc59522c6"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.2.5/ros-parser-1.2.5-windows-x64.zip",
+          "checksum": "sha256:869c5140c91a3e9082e8ccfed8eff3d3307b739227edde6c98ed1a6c94322ef5"
+        }
+      }
+    },
+    {
+      "id": "ros2-topic-subscriber",
+      "name": "ROS 2 Topic Subscriber",
+      "version": "1.1.1",
+      "description": "Subscribe to ROS 2 topics in real time and stream the decoded fields into PlotJuggler.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "ros2",
+        "streaming",
+        "subscriber"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_ros2/v1.1.1/ros2-topic-subscriber-1.1.1-linux-aarch64.zip",
+          "checksum": "sha256:c2bbb9389c34dcc44d80463828a8dede9006eef813f34860442ec6183c30c9f4"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_ros2/v1.1.1/ros2-topic-subscriber-1.1.1-linux-x86_64.zip",
+          "checksum": "sha256:0ef63a8a7e46f4823c804ebd6e5c93b9a6bd5bbfbf88967e97eeac8ad44b1e96"
+        }
+      }
+    },
+    {
+      "id": "toolbox-anomaly-detector",
+      "name": "Anomaly Detector",
+      "version": "0.2.1",
+      "description": "Write Lua anomaly rules over time series and emit plot markers (regions / events) when a rule fires.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "lua",
+        "anomaly",
+        "markers",
+        "toolbox"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-linux-aarch64.zip",
+          "checksum": "sha256:e55af4b854ef0db70cb5c0b372c037bf1df60f38cf861a000ecf36be8cb7dd31"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-linux-x86_64.zip",
+          "checksum": "sha256:95ac58ef36fddff6b2090ceb70048c20ca869c3d01e4f9b3647eae407087cfba"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-macos-arm64.zip",
+          "checksum": "sha256:058f674ef2de4464377122e23098646f37195ff991725312bfa1696e6b0ff86a"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-windows-arm64.zip",
+          "checksum": "sha256:10bf484736f0cd7f18446f9f90c95ab5bced876e3c0461ae2a73a2051ce95f2c"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-windows-x64.zip",
+          "checksum": "sha256:0d34a7ce8bdf28f0fb8692faf4230ff52b02d052a5c90f0c306dd7480fe06970"
+        }
+      }
+    },
+    {
+      "id": "toolbox-assistant-agent",
+      "name": "Assistant Agent",
+      "version": "0.2.0",
+      "description": "A chat assistant that drives PlotJuggler through the plugin SDK: lists and describes topics, reads series statistics, and creates derived timeseries, markers and plot tabs it owns. Uses the Claude Code or Codex CLI already installed and signed in on your machine; the plugin stores no API keys. Linux, macOS and Windows.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "llm",
+        "assistant",
+        "agent",
+        "claude",
+        "codex"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.34.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_assistant_agent/v0.2.0/toolbox-assistant-agent-0.2.0-linux-aarch64.zip",
+          "checksum": "sha256:7fe9fc3088e90d6c1b3a2b6642e1fb9588dcb30a3e86a4b2e1d1eac98ac5ad26"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_assistant_agent/v0.2.0/toolbox-assistant-agent-0.2.0-linux-x86_64.zip",
+          "checksum": "sha256:ceee35dea212d7a8821a571ef1b0dde9d8afd6f5a04bc7d71ac47c6f46c5ddbd"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_assistant_agent/v0.2.0/toolbox-assistant-agent-0.2.0-macos-arm64.zip",
+          "checksum": "sha256:af2219ebe04a18c34c62a6b160af4bec04c2d7d0479febd287b56ed01194b3f8"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_assistant_agent/v0.2.0/toolbox-assistant-agent-0.2.0-windows-arm64.zip",
+          "checksum": "sha256:b2cccedfb2d4839d3ba3861710f80cade2dff7f7d56809a3d968b260519941bb"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_assistant_agent/v0.2.0/toolbox-assistant-agent-0.2.0-windows-x64.zip",
+          "checksum": "sha256:180b4597e991bd2b82f22c42468c67f6d695ff52fe0efea310970dfef61940ce"
+        }
+      }
+    },
+    {
+      "id": "toolbox-data-exporter",
+      "name": "CSV/Parquet Exporter",
+      "version": "0.114.1",
+      "description": "Export selected time series to CSV or Parquet files.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "csv",
+        "parquet",
+        "export",
+        "toolbox"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_data_exporter/v0.114.1/toolbox-data-exporter-0.114.1-linux-aarch64.zip",
+          "checksum": "sha256:eef4d69ab4f16d1501b6d6bc2dfd29e259e659329af9b11f798f2b9bc52960dc"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_data_exporter/v0.114.1/toolbox-data-exporter-0.114.1-linux-x86_64.zip",
+          "checksum": "sha256:49522b35a1431b57abbe610dd9c57078af75d34fe515fd461a28ecc7f0018e7f"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_data_exporter/v0.114.1/toolbox-data-exporter-0.114.1-macos-arm64.zip",
+          "checksum": "sha256:1a234bc68af8568c0b41d8431c092dfc4248f822e74fccb6a1404025574512c5"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_data_exporter/v0.114.1/toolbox-data-exporter-0.114.1-windows-arm64.zip",
+          "checksum": "sha256:229b4a926987795161df5711e8916dbce1392ce9f19a67e8f33b8dabc96c496f"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_data_exporter/v0.114.1/toolbox-data-exporter-0.114.1-windows-x64.zip",
+          "checksum": "sha256:eb42957c5900c7dd689071383685fe9b684772902ca0a3bc0e05deb763e1baaa"
+        }
+      }
+    },
+    {
+      "id": "toolbox-fft",
+      "name": "Fast Fourier Transform",
+      "version": "1.0.1",
+      "description": "Compute the frequency-domain amplitude of numeric time series using FFT.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "fft",
+        "frequency",
+        "spectrum",
+        "toolbox"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_fft/v1.0.1/toolbox-fft-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:947e4d26a180b170ec1547f6d85d0cc9c5fb229dfce10f651a68d310768da5d9"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_fft/v1.0.1/toolbox-fft-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:038d290152deb4ab6e1abfb088a1b44792e5d55262994e0ecd73ed26803eb87a"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_fft/v1.0.1/toolbox-fft-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:87835b0f504b2f8641de1dcdceb0d52fccf519afd0e6f21c86153b4684af2fb3"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_fft/v1.0.1/toolbox-fft-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:19bc4dc24ce7b192903f98f5fb305683700d39e50728dcc31a89fa6a13b54f88"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_fft/v1.0.1/toolbox-fft-1.0.1-windows-x64.zip",
+          "checksum": "sha256:65330ccba65e1ce74703cc4b150008c5832ed8d82c0b6d0f03ab4c0d4c79ccd2"
+        }
+      }
+    },
+    {
+      "id": "toolbox-mosaico",
+      "name": "Mosaico Cloud Server",
+      "version": "1.3.0",
+      "description": "Browse and import data from Mosaico cloud servers via Apache Arrow Flight. Scalar topics are handed to the host as arrow-ipc messages and decoded by the parser_arrow plugin (install it alongside). Includes Lua metadata predicate filter, multi-topic streaming, and time-range selection.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "cloud",
+        "mosaico",
+        "arrow",
+        "flight"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.31.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.0/toolbox-mosaico-1.3.0-linux-aarch64.zip",
+          "checksum": "sha256:84f25613037be74cad70589414005585887dee656e3d53a22df4b2582faefb39"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.0/toolbox-mosaico-1.3.0-linux-x86_64.zip",
+          "checksum": "sha256:d1d289e8455ba4278ffaedfb54d17dd5b008a35ece96a9e648d2a40feea23211"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.0/toolbox-mosaico-1.3.0-macos-arm64.zip",
+          "checksum": "sha256:04fa85c2084e5ebf50ceafd600d31268390f29842470e71b52d9f7b3c5a1a312"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.0/toolbox-mosaico-1.3.0-windows-x64.zip",
+          "checksum": "sha256:e38e0edb09c82d5bf965c7d34dc657e8ba9318c3b82ef2a7003c11938f1e0be2"
+        }
+      }
+    },
+    {
+      "id": "toolbox-quaternion",
+      "name": "Quaternion to RPY",
+      "version": "1.0.1",
+      "description": "Converts quaternion (x, y, z, w) time series into Roll, Pitch, Yaw angles with optional unwrapping and degree/radian output.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "quaternion",
+        "rpy",
+        "rotation",
+        "toolbox"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_quaternion/v1.0.1/toolbox-quaternion-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:d5079a849dca7a1d8c8790305dc8eb0c182716a615bfd6abd50381fe57707f4f"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_quaternion/v1.0.1/toolbox-quaternion-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:5586684e839ab095d23a9f717f7275a835922da9bd9a74aca6778a246246c019"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_quaternion/v1.0.1/toolbox-quaternion-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:c60a0be1551df8396d910f4ab0aa0bc98616291a96bc3db657302896bd452f36"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_quaternion/v1.0.1/toolbox-quaternion-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:4bda17c308ac7c184773d3633b486f1856fa68ee9b25172b63d4636f98bfbcd1"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_quaternion/v1.0.1/toolbox-quaternion-1.0.1-windows-x64.zip",
+          "checksum": "sha256:e6ac3ce79357711ef8c5788545704d4bc41f9be3208e819459a67baf76ce47c1"
+        }
+      }
+    },
+    {
+      "id": "toolbox-transform-editor",
+      "name": "Transform Editor",
+      "version": "1.0.4",
+      "description": "Create named derived time series using Lua functions. Equivalent to the Custom Series editor in PJ3.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "lua",
+        "transform",
+        "derived",
+        "custom",
+        "toolbox",
+        "hidden"
+      ],
+      "min_plotjuggler_version": "3.999.3",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.0.4/toolbox-transform-editor-1.0.4-linux-aarch64.zip",
+          "checksum": "sha256:7f1bb9c240f3df677b41553df444b13552e95be3c730746c9aae076a0998088b"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.0.4/toolbox-transform-editor-1.0.4-linux-x86_64.zip",
+          "checksum": "sha256:c8591333fc15e4a7e339a812765d1283df3291483938cc5314beb93ddd6c1f1f"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.0.4/toolbox-transform-editor-1.0.4-macos-arm64.zip",
+          "checksum": "sha256:4971265b3c47628d4870962d5377dca40c8ee791c9b5b0f39c4e4d9a3e070707"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.0.4/toolbox-transform-editor-1.0.4-windows-arm64.zip",
+          "checksum": "sha256:f3cfaa8b1272ba6fc234c1145c9188cc64a0c6f30798c51c529d40402aa01133"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.0.4/toolbox-transform-editor-1.0.4-windows-x64.zip",
+          "checksum": "sha256:9b9dd30139c80d039d933e96d46fd6cbd6fe039e4015c72a610661ae6e5306a0"
+        }
+      }
+    },
+    {
+      "id": "udp-server",
+      "name": "UDP Server",
+      "version": "0.9.1",
+      "description": "Real-time data streaming via UDP. Supports unicast and multicast IPv4/IPv6.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "udp",
+        "stream",
+        "realtime",
+        "network",
+        "multicast"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_udp/v0.9.1/udp-server-0.9.1-linux-aarch64.zip",
+          "checksum": "sha256:3ac0353a60be1e7a502a4b0b4833b93220eb28d898c7950e85c538b43d7dad82"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_udp/v0.9.1/udp-server-0.9.1-linux-x86_64.zip",
+          "checksum": "sha256:bcd532a1fb45fc33a9ed7a9f3610efaae1d63f947b00b9f3acb7ee2ac6a23c25"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_udp/v0.9.1/udp-server-0.9.1-macos-arm64.zip",
+          "checksum": "sha256:07301ba02769493979eb371ffe85cce3b315a610a0978a9c3ab38b1fa5a9772b"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_udp/v0.9.1/udp-server-0.9.1-windows-arm64.zip",
+          "checksum": "sha256:43ec2dec32f60eb3564dec8e08050c9c4e727559b6e440180a97bcaf9b85b3d7"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_udp/v0.9.1/udp-server-0.9.1-windows-x64.zip",
+          "checksum": "sha256:dbbd3f5cce239fef566d9e4235cbe0779109aaa76c5de091f544239e2a44e9a5"
+        }
+      }
+    },
+    {
+      "id": "ulog-loader",
+      "name": "ULog Loader",
+      "version": "1.1.2",
+      "description": "Data loader for PX4 ULog files. Flight log format for PX4 autopilot.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "ulog",
+        "file",
+        "loader",
+        "px4",
+        "drone",
+        "flight"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.28.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-linux-aarch64.zip",
+          "checksum": "sha256:8c63566cbffea58091485b95a5e126b64f921a86b7996b91ab1d1f1e2f6cc361"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-linux-x86_64.zip",
+          "checksum": "sha256:739069ca73d5f3c5f43492ecbf0f45dce63b87775775cf9b95331344e2880a4d"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-macos-arm64.zip",
+          "checksum": "sha256:bceb923f196e58cdf6fa9198f2782c26020628d378eeddffbf5d7f08fcfe7dfb"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-windows-arm64.zip",
+          "checksum": "sha256:a77f870829d13468a4739e086d616edd418417926fe59ac719aabe82bf821788"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-windows-x64.zip",
+          "checksum": "sha256:f2941557cb49f822ecdcf5d4be1c391af8c069f05416e89050200bc28f91203f"
+        }
+      }
+    },
+    {
+      "id": "webrtc-client",
+      "name": "WebRTC Video Client",
+      "version": "1.0.1",
+      "description": "Receives live H.264 video via standard WHEP (mediamtx, go2rtc, LiveKit, Cloudflare Stream...) and feeds each stream to PlotJuggler as canonical PJ.VideoFrame messages. One HTTP request per stream, per-camera reconnect, mediamtx Control API discovery. H.264 pass-through; no transcode.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "webrtc",
+        "whep",
+        "mediamtx",
+        "video",
+        "h264",
+        "camera",
+        "streaming",
+        "realtime",
+        "libdatachannel"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_webrtc/v1.0.1/webrtc-client-1.0.1-linux-aarch64.zip",
+          "checksum": "sha256:bcb823d457b50a79b647d8243c8d970cecaf05643f52aaa2d3acb5352a8c4b6a"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_webrtc/v1.0.1/webrtc-client-1.0.1-linux-x86_64.zip",
+          "checksum": "sha256:ae7b2f58102ed30cf17e4b9e275c6a2842104fdc32644ff27063fcb0f8c3387c"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_webrtc/v1.0.1/webrtc-client-1.0.1-macos-arm64.zip",
+          "checksum": "sha256:1fe5160352c71cb0ac8b17e51ce3c638ab70541ffc708ed96873f5c68c56dcb7"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_webrtc/v1.0.1/webrtc-client-1.0.1-windows-arm64.zip",
+          "checksum": "sha256:d1d86afd23bacfec48c223de9aa0a969cdadfdddde0696373926e85cac59f3c0"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_webrtc/v1.0.1/webrtc-client-1.0.1-windows-x64.zip",
+          "checksum": "sha256:0423385f2b38bcab4c2ef107d5a4f1284068d0c62b40742512f83e352f812411"
+        }
+      }
+    },
+    {
+      "id": "zmq-subscriber",
+      "name": "ZMQ Subscriber",
+      "version": "0.9.3",
+      "description": "Real-time data streaming via ZeroMQ. High-performance messaging for distributed systems.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_stream",
+      "tags": [
+        "zmq",
+        "zeromq",
+        "stream",
+        "realtime",
+        "subscriber"
+      ],
+      "min_plotjuggler_version": "3.999.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_zmq/v0.9.3/zmq-subscriber-0.9.3-linux-aarch64.zip",
+          "checksum": "sha256:933e0793d5e2f862dd460c04cc7e408f1290fb266e5d186748802991bf80852e"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_zmq/v0.9.3/zmq-subscriber-0.9.3-linux-x86_64.zip",
+          "checksum": "sha256:e8f808073597eeaf937e685b4744941262b48ae457df82a47d2b55cd5e0c4578"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_zmq/v0.9.3/zmq-subscriber-0.9.3-macos-arm64.zip",
+          "checksum": "sha256:c0dd8aefccac93071bc1fe4e18f5afc2bbcc77aa21db5746df72d9017157b5c7"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_zmq/v0.9.3/zmq-subscriber-0.9.3-windows-arm64.zip",
+          "checksum": "sha256:b27373487f3aa9b4b0b60d126261624c4d9e8fddc81848481301324f4790d756"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_zmq/v0.9.3/zmq-subscriber-0.9.3-windows-x64.zip",
+          "checksum": "sha256:dc5d7131aa15eab4357692e965c15f1d0f8e1845c58039743e1dbd6fa6988105"
+        }
+      }
+    },
+    {
+      "id": "airbound-apbin-loader",
+      "name": "ArduPilot Bin",
+      "version": "0.1.0",
+      "description": "Data loader for ArduPilot DataFlash (.bin) logs. Ported from the Airbound PlotJuggler 3 fork of ArduPilot/plotjuggler-apbin-plugins.",
+      "author": "Pierre Kancir, Jonas Withelm, Airbound",
+      "publisher": "Airbound",
+      "website": "https://github.com/AirboundInc/PlotJuggler",
+      "repository": "https://github.com/AirboundInc/PlotJuggler",
+      "license": "LGPL-3.0",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "ardupilot",
+        "dataflash",
+        "bin",
+        "file",
+        "loader",
+        "drone",
+        "flight"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.32.0",
+      "platforms": {
+        "windows-x86_64": {
+          "url": "https://github.com/AirboundInc/PlotJuggler/releases/download/data_load_apbin/v0.1.0/airbound-apbin-loader-0.1.0-windows-x64.zip",
+          "checksum": "sha256:adc173360d770ae2144ac2afbea1081b0b04e2283b45a2b7117736ad8bb1c786"
+        }
+      }
+    }
+  ]
+}
