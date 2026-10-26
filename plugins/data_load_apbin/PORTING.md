@@ -122,3 +122,12 @@ constant (472 335.072 s, ±256 ns double rounding).
   values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_TF` onto an empty
   plot area to open a 3D view, then right-click the `vehicle` frame for "Create trail" and "Follow
   this frame" (also in the 3D settings panel: Create Trail, Follow frame, Frames size).
+- **Position setpoint for the 3D view (2026-10-26).** Same `_TF` topic (all transforms merged in time
+  order), frame `world -> setpoint`: the position controller's target `PSCN.TPN` / `PSCE.TPE` /
+  `PSCD.TPD` (metres north/east/down from the EKF origin, the same frame as XKF1), converted to ENU
+  like the vehicle, with identity rotation (a position setpoint has no attitude). Driven by PSCN's
+  timestamps; PSCE/PSCD are paired by nearest sample within 5 ms (the three are logged in the same
+  loop, ~10 us apart). Only logged while the position controller runs (VTOL / multicopter), so
+  the 3D view holds the last setpoint through fixed-wing flight. Checked on AA-TRT-0051:
+  `TFEDGES _TF ordered=yes world->setpoint=2868 world->vehicle=5652`, values equal to the raw
+  PSC fields.

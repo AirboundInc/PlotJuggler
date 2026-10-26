@@ -11,7 +11,8 @@
 //   SERIES <topic>/<field> count=<n> t0=<ns> t1=<ns> hash=<fnv1a of (ns, value bits)>
 // Points are stable-sorted by time before hashing (PJ3's PlotData keeps series time-sorted).
 // Object topics (pj.source_object_write.v1) print one OBJECT summary line each; FrameTransforms
-// topics also print TF lines for a few decoded samples.
+// topics also print a TFEDGES line (transforms per frame edge, entry order) and TF lines for a
+// few decoded samples.
 
 #include <pj_base/builtin/frame_transforms_codec.hpp>
 #include <pj_base/data_source_protocol.h>
@@ -399,6 +400,24 @@ int main(int argc, char** argv) {
     if (object.metadata.find("kFrameTransforms") == std::string::npos || object.entries.empty()) {
       continue;
     }
+    // Transforms per parent->child edge, and whether entries arrive in time order.
+    std::map<std::string, size_t> per_edge;
+    bool ordered = true;
+    for (size_t i = 0; i < object.entries.size(); ++i) {
+      const auto& [ts, bytes] = object.entries[i];
+      ordered = ordered && (i == 0 || object.entries[i - 1].first <= ts);
+      if (const auto decoded = PJ::deserializeFrameTransforms(bytes.data(), bytes.size())) {
+        for (const auto& tf : decoded->transforms) {
+          ++per_edge[tf.parent_frame_id + "->" + tf.child_frame_id];
+        }
+      }
+    }
+    std::printf("TFEDGES %s ordered=%s", object.name.c_str(), ordered ? "yes" : "NO");
+    for (const auto& [edge, count] : per_edge) {
+      std::printf(" %s=%zu", edge.c_str(), count);
+    }
+    std::printf("\n");
+
     // A few evenly spaced samples, decoded, with the heading implied by the rotation
     // (ENU yaw of the body x axis, converted back to a compass bearing).
     const size_t n = object.entries.size();

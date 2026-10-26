@@ -28,6 +28,7 @@
 #include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <pj_base/builtin/frame_transforms_codec.hpp>
 #include <pj_base/sdk/data_source_patterns.hpp>
 #include <stdexcept>
@@ -296,8 +297,19 @@ private:
   PJ::Status readDataFromFile();
   PJ::Status publish();
 
-  // PJ4: vehicle pose (world -> vehicle) from the EKF, as a transform topic for the 3D view.
-  PJ::Status publish_vehicle_transforms();
+  // PJ4: the _TF topic for the 3D view: every transform the collectors below produce,
+  // pushed in time order.
+  PJ::Status publish_transforms();
+
+  // world -> vehicle: EKF position and attitude (XKF1, following the primary core).
+  void collect_vehicle_transforms(std::vector<PJ::sdk::FrameTransform>& out);
+
+  // world -> setpoint: the position controller's target position (PSCN/PSCE/PSCD).
+  void collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransform>& out);
+
+  // 0.01 for a centi-unit field (format c/C/e/E) that no multiplier scaled (a log without
+  // FMTU), else 1: the factor that turns the stored value into its base unit.
+  double centi_factor(const std::string& msg_name, uint8_t field_idx);
 
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);
@@ -1104,7 +1116,7 @@ PJ::Status APBinSource::publish()
     }
   }
 
-  if (auto status = publish_vehicle_transforms(); !status)
+  if (auto status = publish_transforms(); !status)
   {
     return status;
   }
@@ -1165,24 +1177,76 @@ PJ::Status APBinSource::publish()
 }
 
 
-PJ::Status APBinSource::publish_vehicle_transforms()
+double APBinSource::centi_factor(const std::string& msg_name, uint8_t field_idx)
 {
-  // PJ4: new in the port (not in PJ3). XKF1, one instance per EKF3 core, carries the local
-  // position (metres north/east/down from the EKF origin) and the attitude together. The pose
-  // follows the primary core over time, as reported by XKF4's PI field (core 0 if not logged).
+  const char format_char = formats[msg_name2id[msg_name]].format[field_idx];
+  const bool centi = format_char == 'c' || format_char == 'C' || format_char == 'e' || format_char == 'E';
+  const std::vector<bool>& scaled = scaled_fields[msg_name];
+  const bool was_scaled = field_idx < scaled.size() && scaled[field_idx];
+  return centi && !was_scaled ? 0.01 : 1.0;
+}
+
+
+PJ::Status APBinSource::publish_transforms()
+{
+  // PJ4: new in the port (not in PJ3).
+  std::vector<PJ::sdk::FrameTransform> transforms;
+  collect_vehicle_transforms(transforms);
+  collect_setpoint_transforms(transforms);
+  if (transforms.empty())
+  {
+    return PJ::okStatus();
+  }
+
+  const auto* object_host = objectWriteHost();
+  if (object_host == nullptr)
+  {
+    return PJ::okStatus();  // host without an object store: numeric data only
+  }
+  auto topic = object_host->registerTopic("_TF", PJ::sdk::BuiltinObjectType::kFrameTransforms);
+  if (!topic)
+  {
+    return PJ::unexpected(topic.error());
+  }
+
+  // One transform per entry, all frames on one time-ordered topic.
+  std::stable_sort(transforms.begin(), transforms.end(),
+                   [](const PJ::sdk::FrameTransform& a, const PJ::sdk::FrameTransform& b) {
+                     return a.timestamp < b.timestamp;
+                   });
+  PJ::sdk::FrameTransforms message;
+  message.transforms.resize(1);
+  for (const PJ::sdk::FrameTransform& tf : transforms)
+  {
+    message.transforms.front() = tf;
+    const std::vector<uint8_t> bytes = PJ::serializeFrameTransforms(message);
+    if (auto status = object_host->pushOwned(*topic, tf.timestamp, PJ::Span<const uint8_t>(bytes.data(), bytes.size()));
+        !status)
+    {
+      return status;
+    }
+  }
+  return PJ::okStatus();
+}
+
+
+void APBinSource::collect_vehicle_transforms(std::vector<PJ::sdk::FrameTransform>& out)
+{
+  // XKF1, one instance per EKF3 core, carries the local position (metres north/east/down from
+  // the EKF origin) and the attitude together. The pose follows the primary core over time, as
+  // reported by XKF4's PI field (core 0 if not logged).
   const char* const kFields[] = {"TimeUS", "PN", "PE", "PD", "Roll", "Pitch", "Yaw"};
   constexpr size_t kFieldCount = std::size(kFields);
 
   const auto xkf1_it = messages_map.find("XKF1");
   if (xkf1_it == messages_map.end() || xkf1_it->second.empty())
   {
-    return PJ::okStatus();  // no EKF3 output in this log: no 3D pose
+    return;  // no EKF3 output in this log: no vehicle pose
   }
 
   // Field positions and units, identical for every core.
   const auto& name2idx = field_name2idx["XKF1"];
   const uint8_t msg_id = msg_name2id["XKF1"];
-  const std::vector<bool>& scaled = scaled_fields["XKF1"];
   uint8_t field_idx[kFieldCount] = {};
   double factors[kFieldCount] = {};
   for (size_t i = 0; i < kFieldCount; i++)
@@ -1193,14 +1257,10 @@ PJ::Status APBinSource::publish_vehicle_transforms()
       runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
                                   std::string("ArduPilot Bin: XKF1 has no '") + kFields[i] +
                                       "' field, the 3D vehicle pose is not available");
-      return PJ::okStatus();
+      return;
     }
-    const uint8_t idx = idx_it->second;
-    field_idx[i] = idx;
-    // Without FMTU no multiplier was applied: the centi-unit formats are still x100.
-    const char format_char = formats[msg_id].format[idx];
-    const bool centi = format_char == 'c' || format_char == 'C' || format_char == 'e' || format_char == 'E';
-    factors[i] = (i > 0 && centi && !(idx < scaled.size() && scaled[idx])) ? 0.01 : 1.0;
+    field_idx[i] = idx_it->second;
+    factors[i] = i > 0 ? centi_factor("XKF1", idx_it->second) : 1.0;
   }
 
   // Primary core over time: XKF4.PI. Every core's XKF4 logs it; use core 0's (else the first).
@@ -1241,14 +1301,7 @@ PJ::Status APBinSource::publish_vehicle_transforms()
     return std::lround(primary_cores[k]);
   };
 
-  // XKF1 samples of whichever core was primary at their time, merged in time order.
-  struct PoseSample
-  {
-    double time;
-    const message_data* data;
-    size_t row;
-  };
-  std::vector<PoseSample> samples;
+  // XKF1 samples of whichever core was primary at their time.
   for (const auto& [instance, data] : xkf1_it->second)
   {
     long core = 0;
@@ -1273,52 +1326,111 @@ PJ::Status APBinSource::publish_vehicle_transforms()
     const std::vector<double>& times = data[field_idx[0]].second;
     for (size_t row = 0; row < count; row++)
     {
-      if (primary_at(times[row]) == core)
+      if (primary_at(times[row]) != core)
       {
-        samples.push_back({times[row], &data, row});
+        continue;
       }
+      const auto value = [&](size_t field) { return data[field_idx[field]].second[row] * factors[field]; };
+      const double north = value(1), east = value(2), down = value(3);
+      const double roll = value(4), pitch = value(5), yaw = value(6);
+      if (!std::isfinite(north) || !std::isfinite(east) || !std::isfinite(down) || !std::isfinite(roll) ||
+          !std::isfinite(pitch) || !std::isfinite(yaw))
+      {
+        continue;
+      }
+      PJ::sdk::FrameTransform tf;
+      tf.timestamp = to_timestamp(times[row]);
+      tf.parent_frame_id = "world";
+      tf.child_frame_id = "vehicle";
+      tf.translation = {.x = east, .y = north, .z = -down};
+      tf.rotation = enu_flu_quaternion(roll, pitch, yaw);
+      out.push_back(std::move(tf));
     }
   }
-  std::stable_sort(samples.begin(), samples.end(),
-                   [](const PoseSample& a, const PoseSample& b) { return a.time < b.time; });
+}
 
-  const auto* object_host = objectWriteHost();
-  if (object_host == nullptr)
+
+void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransform>& out)
+{
+  // The position controller logs its target position per axis (metres north/east/down from the
+  // EKF origin, the same frame as XKF1) while it runs, i.e. in VTOL / multicopter position
+  // control; fixed-wing flight logs none. The three messages are written in the same loop, so
+  // each PSCN sample is paired with the nearest PSCE and PSCD samples. A position setpoint has no
+  // attitude: the frame keeps the world orientation. Between active periods the 3D view holds
+  // the last setpoint.
+  struct Axis
   {
-    return PJ::okStatus();  // host without an object store: numeric data only
-  }
-  auto topic = object_host->registerTopic("_TF", PJ::sdk::BuiltinObjectType::kFrameTransforms);
-  if (!topic)
+    const char* msg;
+    const char* field;
+    const std::vector<double>* times = nullptr;
+    const std::vector<double>* values = nullptr;
+    double factor = 1.0;
+  };
+  Axis axes[] = {{"PSCN", "TPN"}, {"PSCE", "TPE"}, {"PSCD", "TPD"}};
+  for (Axis& axis : axes)
   {
-    return PJ::unexpected(topic.error());
+    const auto msg_it = messages_map.find(axis.msg);
+    if (msg_it == messages_map.end() || msg_it->second.empty())
+    {
+      return;  // no position controller output in this log
+    }
+    const message_data& data = msg_it->second.begin()->second;
+    const auto& name2idx = field_name2idx[axis.msg];
+    const auto time_it = name2idx.find("TimeUS");
+    const auto value_it = name2idx.find(axis.field);
+    if (time_it == name2idx.end() || value_it == name2idx.end() || time_it->second >= data.size() ||
+        value_it->second >= data.size())
+    {
+      return;
+    }
+    axis.times = &data[time_it->second].second;
+    axis.values = &data[value_it->second].second;
+    axis.factor = centi_factor(axis.msg, value_it->second);
   }
 
-  PJ::sdk::FrameTransforms message;
-  message.transforms.resize(1);
-  PJ::sdk::FrameTransform& tf = message.transforms.front();
-  tf.parent_frame_id = "world";
-  tf.child_frame_id = "vehicle";
-  for (const PoseSample& sample : samples)
+  // Value of `axis` at its sample nearest to t, if one lies within the pairing window.
+  constexpr double kMaxSkewS = 0.005;
+  const auto nearest = [](const Axis& axis, double t) -> std::optional<double> {
+    const size_t n = std::min(axis.times->size(), axis.values->size());
+    const auto begin = axis.times->begin();
+    const auto it = std::lower_bound(begin, begin + static_cast<std::ptrdiff_t>(n), t);
+    size_t best = n;
+    double best_gap = kMaxSkewS;
+    for (auto candidate : {it, it == begin ? it : std::prev(it)})
+    {
+      const auto k = static_cast<size_t>(candidate - begin);
+      if (k < n && std::abs((*axis.times)[k] - t) <= best_gap)
+      {
+        best = k;
+        best_gap = std::abs((*axis.times)[k] - t);
+      }
+    }
+    if (best == n)
+    {
+      return std::nullopt;
+    }
+    return (*axis.values)[best] * axis.factor;
+  };
+
+  const Axis& north_axis = axes[0];
+  const size_t count = std::min(north_axis.times->size(), north_axis.values->size());
+  for (size_t i = 0; i < count; i++)
   {
-    const auto value = [&](size_t field) { return (*sample.data)[field_idx[field]].second[sample.row] * factors[field]; };
-    const double north = value(1), east = value(2), down = value(3);
-    const double roll = value(4), pitch = value(5), yaw = value(6);
-    if (!std::isfinite(north) || !std::isfinite(east) || !std::isfinite(down) || !std::isfinite(roll) ||
-        !std::isfinite(pitch) || !std::isfinite(yaw))
+    const double t = (*north_axis.times)[i];
+    const double north = (*north_axis.values)[i] * north_axis.factor;
+    const std::optional<double> east = nearest(axes[1], t);
+    const std::optional<double> down = nearest(axes[2], t);
+    if (!east || !down || !std::isfinite(north) || !std::isfinite(*east) || !std::isfinite(*down))
     {
       continue;
     }
-    tf.timestamp = to_timestamp(sample.time);
-    tf.translation = {.x = east, .y = north, .z = -down};
-    tf.rotation = enu_flu_quaternion(roll, pitch, yaw);
-    const std::vector<uint8_t> bytes = PJ::serializeFrameTransforms(message);
-    if (auto status = object_host->pushOwned(*topic, tf.timestamp, PJ::Span<const uint8_t>(bytes.data(), bytes.size()));
-        !status)
-    {
-      return status;
-    }
+    PJ::sdk::FrameTransform tf;
+    tf.timestamp = to_timestamp(t);
+    tf.parent_frame_id = "world";
+    tf.child_frame_id = "setpoint";
+    tf.translation = {.x = *east, .y = north, .z = -*down};
+    out.push_back(std::move(tf));
   }
-  return PJ::okStatus();
 }
 
 
