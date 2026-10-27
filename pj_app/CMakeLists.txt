@@ -213,6 +213,14 @@ if(EMSCRIPTEN)
     qt_add_executable(pj_app
         src/main.cpp
         ${CMAKE_SOURCE_DIR}/resources/resources.qrc)
+elseif(WIN32)
+    # WIN32 = GUI subsystem: no console window on launch. Qt6::Core links its
+    # WinMain entry point, which forwards to main(). WindowsConsole reattaches
+    # to a parent terminal for CLI output; plotjuggler4.rc embeds the exe icon.
+    add_executable(pj_app WIN32
+        src/main.cpp
+        src/WindowsConsole.cpp
+        src/plotjuggler4.rc)
 else()
     add_executable(pj_app src/main.cpp)
 endif()

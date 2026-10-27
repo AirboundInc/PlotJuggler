@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: MPL-2.0
+//
+// Windows resources for plotjuggler4.exe. The first ICON is what Explorer, the
+// taskbar and the installer's shortcuts (iconId=0) show for the executable.
+// plotjuggler.ico is rendered from resources/plotjuggler.svg.
+
+IDI_ICON1 ICON "..\\..\\resources\\plotjuggler.ico"

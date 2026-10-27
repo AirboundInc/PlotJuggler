@@ -566,7 +566,8 @@ if ($pluginDlls.Count -gt 0) {
     $validationArgs += "$id=$($resolvedPluginVersions[$id])"
   }
   Info "validating $($resolvedPluginVersions.Count) bundled plugin(s) with the staged app ..."
-  & $stagedExe @validationArgs
+  # Piped so PowerShell waits for the GUI-subsystem exe and sets $LASTEXITCODE.
+  & $stagedExe @validationArgs | Out-Host
   if ($LASTEXITCODE -ne 0) {
     Die "staged plugin validation failed (exit $LASTEXITCODE)"
   }
