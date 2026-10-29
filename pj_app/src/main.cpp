@@ -45,6 +45,9 @@
 #include "MainWindow.h"
 #include "Splashscreen.h"
 #include "WidgetTuner.h"
+#ifdef _WIN32
+#include "WindowsConsole.h"
+#endif
 #include "pj_datastore/data_processor.hpp"
 #include "pj_datastore/processor_detail.hpp"
 #include "pj_plotting/PlotWidgetBase.h"
@@ -200,6 +203,9 @@ int validatePlugins(const QString& plugin_dir, const QStringList& expected_specs
 }  // namespace
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+  PJ::attachParentConsole();
+#endif
 #ifndef PJ_TARGET_WASM
   // Handled before any Q(Core)Application exists: the selftest needs nothing
   // from Qt, while a QApplication would demand a platform plugin — and the
