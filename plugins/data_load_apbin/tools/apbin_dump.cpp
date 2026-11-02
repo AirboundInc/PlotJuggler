@@ -15,6 +15,7 @@
 // few decoded samples.
 
 #include <pj_base/builtin/frame_transforms_codec.hpp>
+#include <pj_base/builtin/scene_entities_codec.hpp>
 #include <pj_base/data_source_protocol.h>
 #include <pj_base/plugin_data_api.h>
 
@@ -397,6 +398,31 @@ int main(int argc, char** argv) {
     const long long t1 = object.entries.empty() ? 0 : object.entries.back().first;
     std::printf("OBJECT %s count=%zu t0=%lld t1=%lld meta=%s\n", object.name.c_str(), object.entries.size(), t0, t1,
                 object.metadata.c_str());
+    if (object.metadata.find("kSceneEntities") != std::string::npos) {
+      for (const auto& [ts, bytes] : object.entries) {
+        const auto decoded = PJ::deserializeSceneEntities(bytes.data(), bytes.size());
+        if (!decoded) {
+          std::printf("MODEL %lld <decode failed>\n", static_cast<long long>(ts));
+          continue;
+        }
+        for (const auto& entity : decoded->entities) {
+          std::printf("MODEL %lld id=%s frame=%s locked=%d lifetime=%lld", static_cast<long long>(ts),
+                      entity.id.c_str(), entity.frame_id.c_str(), entity.frame_locked ? 1 : 0,
+                      static_cast<long long>(entity.lifetime_ns));
+          for (const auto& kv : entity.metadata) {
+            std::printf(" %s=%s", kv.key.c_str(), kv.value.c_str());
+          }
+          for (const auto& model : entity.models) {
+            std::printf(" model(%s, %zu bytes, scale=%.3f, pos=(%.3f, %.3f, %.3f), q=(%.3f, %.3f, %.3f, %.3f))",
+                        model.media_type.c_str(), model.data.size(), model.scale.x, model.pose.position.x,
+                        model.pose.position.y, model.pose.position.z, model.pose.orientation.x,
+                        model.pose.orientation.y, model.pose.orientation.z, model.pose.orientation.w);
+          }
+          std::printf("\n");
+        }
+      }
+      continue;
+    }
     if (object.metadata.find("kFrameTransforms") == std::string::npos || object.entries.empty()) {
       continue;
     }

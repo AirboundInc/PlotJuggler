@@ -113,16 +113,16 @@ constant (472 335.072 s, ±256 ns double rounding).
 
 ## PJ4-only additions
 
-- **Vehicle pose for the 3D view (2026-10-24).** Object topic `_TF` (`kFrameTransforms`), one
+- **Vehicle pose for the 3D view (2026-10-24).** Object topic `_3D/frames` (`kFrameTransforms`; `_TF` until 2026-11-03), one
   `world -> vehicle` transform per EKF sample: XKF1 of the primary EKF3 core at each moment, as
   reported by XKF4's `PI` (core 0 if XKF4 is missing); no 3D pose without XKF1. Position is `PN/PE/PD` (metres from the EKF origin) converted to ENU
   (x = east, y = north, z = up); attitude is `Roll/Pitch/Yaw` converted from body FRD in NED to
   body FLU in ENU (REP-103), so the frame's x axis is the nose. Checked on AA-TRT-0051 with
   `apbin_dump` (`OBJECT`/`TF` lines): 5652 transforms, translation and heading match the raw XKF1
-  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_TF` onto an empty
+  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_3D/model` (or `_3D/frames`) onto an empty
   plot area to open a 3D view, then right-click the `vehicle` frame for "Create trail" and "Follow
   this frame" (also in the 3D settings panel: Create Trail, Follow frame, Frames size).
-- **Position setpoint for the 3D view (2026-10-26).** Same `_TF` topic (all transforms merged in time
+- **Position setpoint for the 3D view (2026-10-26).** Same `_3D/frames` topic (all transforms merged in time
   order), frame `world -> setpoint`: the position controller's target `PSCN.TPN` / `PSCE.TPE` /
   `PSCD.TPD` (metres north/east/down from the EKF origin, the same frame as XKF1), converted to ENU
   like the vehicle, with identity rotation (a position setpoint has no attitude). Driven by PSCN's
@@ -131,3 +131,19 @@ constant (472 335.072 s, ±256 ns double rounding).
   the 3D view holds the last setpoint through fixed-wing flight. Checked on AA-TRT-0051:
   `TFEDGES _TF ordered=yes world->setpoint=2868 world->vehicle=5652`, values equal to the raw
   PSC fields.
+- **Aircraft model for the 3D view (2026-11-02).** Object topic `_3D/model` (`kSceneEntities`; `_MODEL` until 2026-11-03): one
+  entity `aircraft`, `frame_locked` to `vehicle`, lifetime 0, published at the first vehicle pose,
+  holding the airframe's GLB as an inline `ModelPrimitive` (`model/gltf-binary`).
+  - Airframe from the board name in the boot messages (first word of a MSG):
+    `Pixhawk6C-bdshot`/`AB-TRT` -> TRT (`TRT.glb`), `AB-MOD` -> MOD (`TRT_MOD.glb`),
+    `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no model.
+  - Model files are not in the repository: `AIRBOUND_MODELS_DIR`, else `models/` next to the
+    plugin library. Missing file: warning naming the path.
+  - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y; a fixed
+    rotation maps that to the vehicle frame (FLU). Drawn with the largest dimension at 5 m (as the
+    Airbound web log viewer does, so it is visible at flight scale) and the bounding-box centre on
+    the frame origin; bounds come from the GLB's POSITION accessor min/max with node transforms.
+  - Checked on AA-TRT-0051 (board `Pixhawk6C-bdshot`): `MODEL ... id=aircraft frame=vehicle
+    locked=1 lifetime=0 airframe=TRT ... scale=3.575` (1.398 m span).
+  - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
+    servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`) and terrain.
