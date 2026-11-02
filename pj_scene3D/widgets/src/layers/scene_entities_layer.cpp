@@ -32,6 +32,7 @@
 #include "pj_scene3d_core/scene_entities_decode.h"
 #include "pj_scene3d_core/scene_entities_model_state.h"
 #include "pj_scene3d_widgets/parse_locked.h"
+#include "pj_scene3d_widgets/resolve_object.h"
 #include "pj_widgets/ColorPickerWidget.h"
 #include "pj_widgets/DoubleScrubber.h"
 #include "pj_widgets/FrameworkTokens.h"
@@ -247,8 +248,12 @@ bool SceneEntitiesLayer::attach(const PJ::SceneLayerContext& ctx) {
     return false;
   }
   ctx_ = scene3d_ctx;
-  if (!ctx_.session->parserBindingForObjectTopic(topic_id_)) {
-    qCWarning(lcSceneEntitiesLayer) << "attach: no parser for topic_id=" << topic_id_.id;
+  // Accept a parser-backed topic OR a parser-less canonical SceneEntities topic
+  // (a data source/toolbox that pushed serialized canonical entities, decoded
+  // host-side by resolveObject()).
+  if (!ctx_.session->parserBindingForObjectTopic(topic_id_) &&
+      !hasCanonical3DCodec(PJ::sdk::BuiltinObjectType::kSceneEntities)) {
+    qCWarning(lcSceneEntitiesLayer) << "attach: no parser and no canonical codec for topic_id=" << topic_id_.id;
     return false;
   }
   // A dataset reload (SessionManager::replaceDataset) re-attaches without a
@@ -367,10 +372,7 @@ bool SceneEntitiesLayer::bootstrap() {
     return false;
   }
   const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-  if (!binding) {
-    return false;
-  }
-  auto obj = parseLocked(binding, first->timestamp, first->payload);
+  auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, first->timestamp, first->payload);
   if (!obj.has_value()) {
     qCWarning(lcSceneEntitiesLayer) << "bootstrap parseObject failed:" << QString::fromStdString(obj.error());
     return false;
@@ -416,10 +418,8 @@ void SceneEntitiesLayer::renderAt(int64_t time_ns) {
     return;
   }
   const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-  if (!binding) {
-    return;
-  }
-  auto obj = parseLocked(binding, resolved->timestamp, resolved->payload);
+  auto obj =
+      resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, resolved->timestamp, resolved->payload);
   if (!obj.has_value()) {
     qCWarning(lcSceneEntitiesLayer) << "renderAt parseObject failed:" << QString::fromStdString(obj.error());
     return;
@@ -517,10 +517,7 @@ bool SceneEntitiesLayer::applyWindow(int64_t lo_ns, int64_t hi_ns) {
       continue;  // evicted between the snapshot and the resolve
     }
     const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-    if (!binding) {
-      continue;
-    }
-    auto obj = parseLocked(binding, entry->timestamp, entry->payload);
+    auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, entry->timestamp, entry->payload);
     if (!obj.has_value()) {
       qCWarning(lcSceneEntitiesLayer) << "applyWindow parseObject failed:" << QString::fromStdString(obj.error());
       continue;

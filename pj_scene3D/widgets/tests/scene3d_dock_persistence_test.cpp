@@ -666,10 +666,12 @@ TEST(Scene3DDockPersistence, QualifiedLayerRejectsKnownLiveObjectTypeMismatch) {
   EXPECT_FALSE(dock.hasTransformBufferForTest());
 }
 
-// A Scene3D dock owns one TF/time domain. Accepting a second dataset currently
-// leaves the first TF buffer bound and renders the second dataset against it,
-// so the add must be rejected until per-layer domains exist.
-TEST(Scene3DDockPersistence, RejectsTopicFromSecondDataset) {
+// A Scene3D dock owns one TF/time domain, so two datasets are never mixed. A dock
+// held only by dataset A's TF config topic (no render layer, nothing the user could
+// remove) switches wholesale to dataset B when B's TF is added: A's config topic is
+// dropped and B's buffer bound, rather than leaving the dock stuck on A. A dock with
+// a render layer of A still refuses B (Scene3DDockCanonicalEntities tests).
+TEST(Scene3DDockPersistence, TransformOnlyDockSwitchesToSecondDataset) {
   PJ::SessionManager session;
   pj::scene3d::TransformService transform_service(session);
   const DatasetTopic a = registerTfDataset(session, "a.dat", "/tf_a");
@@ -681,8 +683,8 @@ TEST(Scene3DDockPersistence, RejectsTopicFromSecondDataset) {
   ASSERT_TRUE(dock.addTopic(a.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_a"_s));
   ASSERT_EQ(dock.boundDatasetIdForTest(), a.dataset_id);
 
-  EXPECT_FALSE(dock.addTopic(b.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_b"_s));
-  EXPECT_EQ(dock.boundDatasetIdForTest(), a.dataset_id);
+  EXPECT_TRUE(dock.addTopic(b.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_b"_s));
+  EXPECT_EQ(dock.boundDatasetIdForTest(), b.dataset_id);
 
   QDomDocument state_doc;
   const QDomElement state = dock.xmlSaveState(state_doc);
@@ -690,7 +692,7 @@ TEST(Scene3DDockPersistence, RejectsTopicFromSecondDataset) {
   for (QDomElement config = state.firstChildElement(u"config_topic"_s); !config.isNull();
        config = config.nextSiblingElement(u"config_topic"_s)) {
     ++config_count;
-    EXPECT_EQ(config.attribute(u"dataset_id"_s).toUInt(), a.dataset_id);
+    EXPECT_EQ(config.attribute(u"dataset_id"_s).toUInt(), b.dataset_id) << "dataset A's TF must be gone, not mixed";
   }
   EXPECT_EQ(config_count, 1);
 }

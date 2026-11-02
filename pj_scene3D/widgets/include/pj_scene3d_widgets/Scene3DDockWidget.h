@@ -261,6 +261,13 @@ class Scene3DDockWidget : public SceneDockWidget {
   // belongs to the bound dataset. This is what lets the dock rebind to a second
   // dataset's TF tree after the first dataset's topics are gone (M.17).
   void resetTransformBindingIfDatasetGone();
+  // Before a topic from another dataset is added: when the bound dataset is held
+  // ONLY by config (TF) topics, which have no layer row the user could remove,
+  // drop them and unbind so the new topic rebinds the dock to its own dataset.
+  // TF trails are kept: they follow frames by name, so they carry over to the new
+  // tree. Returns false (binding untouched) while a render layer of the bound
+  // dataset remains — mixing its frames with another tree would be wrong.
+  bool releaseBindingHeldOnlyByConfigTopics();
   // Connect to SessionManager::samplesIngested so streamed FrameTransform
   // messages are accumulated into the dataset's TF buffer live (file load uses
   // the bulk ingest instead). Re-callable: drops any prior connection first.

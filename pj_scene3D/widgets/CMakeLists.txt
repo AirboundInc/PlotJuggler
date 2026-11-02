@@ -519,6 +519,12 @@ if(PJ_BUILD_TESTS)
     tests/scene3d_dock_depth_gate_test.cpp
   )
 
+  # A parser-less canonical SceneEntities topic (a data source pushing serialized
+  # objects) dropped on a fresh 3D view becomes a SceneEntities layer.
+  list(APPEND PJ_SCENE3D_WIDGET_TESTS
+    tests/scene3d_dock_canonical_entities_test.cpp
+  )
+
   # PosesInFrameLayer: tracker-time decode -> triad expansion, scrub coalescing,
   # size/opacity re-expansion, empty/orphan edges, the per-use parseLocked rebind
   # guard, and the copy/paste/apply-to-family param round-trip (serializeLayerParams).

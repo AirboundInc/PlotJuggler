@@ -591,7 +591,7 @@ bool Scene3DDockWidget::addTopicImpl(
   }
   if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
     const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
-    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
+    if (incoming_dataset != 0 && incoming_dataset != dataset_id_ && !releaseBindingHeldOnlyByConfigTopics()) {
       return false;
     }
   }
@@ -972,6 +972,30 @@ void Scene3DDockWidget::prepareTransformBufferForTopic(ObjectTopicId topic_id) {
     view_->setTransformBuffer(tf_buffer_);
   }
   pushTransformBufferToTrailLayers();
+}
+
+bool Scene3DDockWidget::releaseBindingHeldOnlyByConfigTopics() {
+  for (const auto& [topic, dataset] : scene_topic_datasets_) {
+    if (dataset == dataset_id_ && !config_topics_.contains(topic)) {
+      return false;  // a render layer of the bound dataset is still in the dock
+    }
+  }
+  for (auto it = config_topics_.begin(); it != config_topics_.end();) {
+    if (const auto mapped = scene_topic_datasets_.find(*it);
+        mapped != scene_topic_datasets_.end() && mapped->second == dataset_id_) {
+      scene_topic_datasets_.erase(mapped);
+      it = config_topics_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  tf_buffer_.reset();
+  dataset_id_ = 0;
+  if (view_ != nullptr) {
+    view_->setTransformBuffer(nullptr);
+  }
+  pushTransformBufferToTrailLayers();  // the new topic's bind pushes the new buffer
+  return true;
 }
 
 void Scene3DDockWidget::resetTransformBindingIfDatasetGone() {
