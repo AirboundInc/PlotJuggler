@@ -139,8 +139,12 @@ constant (472 335.072 s, ±256 ns double rounding).
     `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no model.
   - Model files are not in the repository: `AIRBOUND_MODELS_DIR`, else `models/` next to the
     plugin library. Missing file: warning naming the path.
-  - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y; a fixed
-    rotation maps that to the vehicle frame (FLU). Drawn with the largest dimension at 5 m (as the
+  - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y. The 3D
+    view's mesh loader converts glTF's Y-up to Z-up on import ((x, y, z) -> (x, -z, y)), so the
+    loaded mesh has the nose +Y, right wing +X, up +Z, and the pose rotation maps THAT to the
+    vehicle frame (FLU): -90 degrees about z. (Mapping the raw glTF axes instead double-counts the
+    loader's conversion and pitches the model 90 degrees: vertical in fixed-wing flight,
+    horizontal in hover.) Drawn with the largest dimension at 5 m (as the
     Airbound web log viewer does, so it is visible at flight scale) and the bounding-box centre on
     the frame origin; bounds come from the GLB's POSITION accessor min/max with node transforms.
   - Checked on AA-TRT-0051 (board `Pixhawk6C-bdshot`): `MODEL ... id=aircraft frame=vehicle

@@ -589,10 +589,14 @@ bool Scene3DDockWidget::addTopicImpl(
   if (object_type == sdk::BuiltinObjectType::kFrameTransforms && config_topics_.contains(topic_id.id)) {
     return true;
   }
+  bool switched_dataset = false;
   if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
     const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
-    if (incoming_dataset != 0 && incoming_dataset != dataset_id_ && !releaseBindingHeldOnlyByConfigTopics()) {
-      return false;
+    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
+      if (!releaseBindingHeldOnlyByConfigTopics()) {
+        return false;
+      }
+      switched_dataset = true;
     }
   }
   if (!handlesObjectType(object_type)) {
@@ -612,6 +616,13 @@ bool Scene3DDockWidget::addTopicImpl(
   const bool accepted = SceneDockWidget::addTopic(topic_id, object_type, title);
   if (accepted) {
     setWindowTitle(title.isEmpty() ? tr("3D View") : tr("3D View - %1").arg(title));
+    if (switched_dataset) {
+      // The cached render time was converted and clamped against the previous
+      // dataset's layers; re-convert the current playhead against the new one, or
+      // the view keeps looking the new dataset up at the old instant until the
+      // slider moves.
+      SceneDockWidget::onTrackerTime(last_tracker_display_);
+    }
     recomputeOrphanStates();
   }
   return accepted;

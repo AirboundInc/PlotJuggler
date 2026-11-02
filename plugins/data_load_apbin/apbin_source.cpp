@@ -175,15 +175,23 @@ PJ::sdk::Quaternion enu_flu_quaternion(double roll_deg, double pitch_deg, double
   return quaternion_from_matrix(m);
 }
 
-// The rotation from an Airbound aircraft model's axes to the vehicle frame's (body FLU). The
-// models are Blender glTF exports with the nose towards -Z, the right wing towards +X and up +Y,
-// so x_flu = -z_model, y_flu = -x_model, z_flu = +y_model.
+// The Airbound aircraft models are Blender glTF exports: nose towards -Z, right wing +X, up +Y.
+// The 3D view's mesh loader turns glTF's Y-up into its Z-up on import ((x, y, z) -> (x, -z, y),
+// pj_scene3D mesh_loader.cpp), so the loaded mesh has the nose towards +Y, the right wing +X and
+// up +Z. A model primitive's pose applies to that loaded mesh.
+std::array<double, 3> gltf_to_loaded(const std::array<double, 3>& v)
+{
+  return {v[0], -v[2], v[1]};
+}
+
+// The rotation from the loaded mesh's axes to the vehicle frame's (body FLU): x_flu = +y_mesh,
+// y_flu = -x_mesh, z_flu = +z_mesh (90 degrees about the vertical).
 PJ::sdk::Quaternion model_to_flu_quaternion()
 {
   const double m[3][3] = {
-      {0.0, 0.0, -1.0},
-      {-1.0, 0.0, 0.0},
       {0.0, 1.0, 0.0},
+      {-1.0, 0.0, 0.0},
+      {0.0, 0.0, 1.0},
   };
   return quaternion_from_matrix(m);
 }
@@ -1552,7 +1560,7 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns)
   const double scale = kDisplaySizeM / bounds->max_extent;
   PJ::sdk::ModelPrimitive model;
   model.pose.orientation = model_to_flu_quaternion();
-  const std::array<double, 3> centre = rotate(model.pose.orientation, bounds->centre);
+  const std::array<double, 3> centre = rotate(model.pose.orientation, gltf_to_loaded(bounds->centre));
   model.pose.position = {.x = -centre[0] * scale, .y = -centre[1] * scale, .z = -centre[2] * scale};
   model.scale = {.x = scale, .y = scale, .z = scale};
   model.media_type = "model/gltf-binary";

@@ -100,6 +100,40 @@ TEST(Scene3DDockCanonicalEntities, SwitchesLogWhenOnlyTransformTopicsHoldTheOldO
   EXPECT_EQ(dock.layers().size(), 1U);
 }
 
+// After switching logs, the view must re-convert the current playhead against the new
+// log's layers. The cached render time was clamped to the OLD log's layer range;
+// replaying it would look the new log up at the old instant, where its frames do not
+// exist (only the fixed root draws) until the slider moves.
+TEST(Scene3DDockCanonicalEntities, SwitchingLogsReconvertsThePlayhead) {
+  PJ::SessionManager session;  // "Use time offset" off: display seconds are absolute
+  pj::scene3d::TransformService transform_service(session);
+  PJ::ObjectStore& store = session.objectStore();
+  constexpr PJ::Timestamp kLogBStart = 5'000'000'000;
+  const PJ::ObjectTopicId tf_a = registerCanonicalTfTopic(store, /*dataset=*/1, 100);
+  const PJ::ObjectTopicId model_a = registerCanonicalEntitiesTopic(store, 100, /*dataset=*/1);
+  PJ::sdk::SceneEntities later;
+  later.entities.resize(1);
+  later.entities.front().id = "aircraft";
+  later.entities.front().frame_id = "vehicle";
+  ASSERT_TRUE(store.pushOwned(model_a, 200, PJ::serializeSceneEntities(later)).has_value());  // A spans [100, 200]
+  registerCanonicalTfTopic(store, /*dataset=*/2, kLogBStart);
+  const PJ::ObjectTopicId model_b = registerCanonicalEntitiesTopic(store, kLogBStart, /*dataset=*/2);
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(tf_a, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"_TF"_s));
+  ASSERT_TRUE(dock.addTopic(model_a, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
+
+  dock.onTrackerTime(5.0);  // the slider is in log B's span; log A's layer clamps it to 200
+  ASSERT_EQ(dock.lastTrackerNsForTest(), std::optional<int64_t>(200));
+
+  dock.removeTopic(model_a);
+  ASSERT_TRUE(dock.addTopic(model_b, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
+  EXPECT_EQ(dock.lastTrackerNsForTest(), std::optional<int64_t>(kLogBStart))
+      << "the playhead must be re-converted against log B, not replayed at log A's clamped instant";
+}
+
 // While the first log still has a render layer in the view, a second log's topic is
 // still refused: its frames would resolve against the wrong transform tree.
 TEST(Scene3DDockCanonicalEntities, RefusesAnotherLogWhileTheOldOneHasALayer) {
