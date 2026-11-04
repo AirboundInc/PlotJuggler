@@ -188,6 +188,31 @@ TEST(Scene3DFollow, HoldsThroughLookupGapThenResumes) {
   EXPECT_NEAR(view.camera().state().focal.x - focal_initial.x, 3.0f, 1e-4f) << "tracks again after re-seeding";
 }
 
+// --- View: scrubbing from a followed pose to before the frame's first sample and
+//     back to a later pose keeps the camera locked on the frame: on reappearing it
+//     catches up by the frame's whole motion instead of staying where the gap left
+//     it (which loses the target when it reappears far away). ---
+TEST(Scene3DFollow, StaysLockedOnAcrossLookupGap) {
+  auto buf = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);
+  setEdge(*buf, "world", "robot", 100, {0.0, 0.0, 0.0});
+  setEdge(*buf, "world", "robot", 200, {3.0, 0.0, 0.0});
+  setEdge(*buf, "world", "robot", 300, {10.0, 0.0, 0.0});
+
+  SceneViewWidget view;
+  const glm::vec3 focal_initial = view.camera().state().focal;
+  view.setTransformBuffer(buf);
+  view.setFixedFrame("world");
+  view.setFollowFrame("robot");
+  view.setTrackerTime(at(100));  // seed at (0,0,0)
+  view.setTrackerTime(at(200));  // +3
+  view.setTrackerTime(at(50));   // before the first sample: hold
+  EXPECT_NEAR(view.camera().state().focal.x - focal_initial.x, 3.0f, 1e-4f) << "gap must hold the camera";
+
+  view.setTrackerTime(at(300));  // reappears at (10,0,0)
+  EXPECT_NEAR(view.camera().state().focal.x - focal_initial.x, 10.0f, 1e-4f)
+      << "camera must catch up with the frame's motion across the gap";
+}
+
 // --- View: recenterOnFollowFrame moves the pivot onto the followed frame. ---
 TEST(Scene3DFollow, RecenterOnFollowFrameCentersCameraOnTarget) {
   auto buf = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);

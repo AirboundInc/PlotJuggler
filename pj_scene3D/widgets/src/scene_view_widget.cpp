@@ -283,9 +283,10 @@ void SceneViewWidget::applyFollow() {
   }
   const auto x = tf_->tryLookupTransform(fixed_frame_, follow_frame_, render_time_);
   if (!x) {
-    // Followed frame not resolvable now: hold the camera and re-seed when it
-    // reappears, so a lookup gap can't teleport the view on resume.
-    follow_seeded_ = false;
+    // Followed frame not resolvable now (e.g. scrubbed before its first sample):
+    // hold the camera but keep the last known origin, so when the frame reappears
+    // the camera catches up by the frame's motion and stays locked on it. A frame
+    // never seen yet still seeds without a jump.
     return;
   }
   const glm::dvec3 origin = x->t;

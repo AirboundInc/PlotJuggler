@@ -429,7 +429,8 @@ std::optional<ModelBounds> glb_bounds(const std::vector<uint8_t>& glb)
 
 // 3D-view object topics, grouped under one `_3D` node in the datasets tree.
 constexpr const char* kFramesTopic = "_3D/frames";  // FrameTransforms: world -> vehicle / setpoint
-constexpr const char* kModelTopic = "_3D/model";    // SceneEntities: the aircraft model
+constexpr const char* kVehicleTopic = "_3D/vehicle";    // SceneEntities: the aircraft model
+constexpr const char* kSetpointTopic = "_3D/setpoint";  // SceneEntities: the setpoint model
 
 // Airbound airframes by the flight controller board name ArduPilot prints at boot (the first
 // word of that message), and the model file drawn for each.
@@ -604,10 +605,10 @@ private:
   // FMTU), else 1: the factor that turns the stored value into its base unit.
   double centi_factor(const std::string& msg_name, uint8_t field_idx);
 
-  // The model topic (kModelTopic): the detected airframe's GLB model as a scene entity locked to the
-  // vehicle frame over [first_pose_ns, last_pose_ns], plus a translucent copy on the setpoint frame
-  // shown only during each [start, end] run in `setpoint_runs`. Problems only warn; the load still
-  // succeeds.
+  // The model topics: the detected airframe's GLB model as a scene entity locked to the vehicle
+  // frame from `first_pose_ns` on (kVehicleTopic), and a translucent copy on the setpoint frame
+  // shown only during each [start, end] run in `setpoint_runs`, the topic ending at
+  // `last_pose_ns` (kSetpointTopic). Problems only warn; the load still succeeds.
   void publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
                              const std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>>& setpoint_runs);
 
@@ -1629,96 +1630,92 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timesta
   model.media_type = "model/gltf-binary";
   model.data = std::move(glb);
 
-  PJ::sdk::SceneEntity entity;
-  entity.timestamp = first_pose_ns;
-  entity.frame_id = "vehicle";
-  entity.id = "aircraft";
-  entity.frame_locked = true;  // follows the vehicle frame; lifetime 0 = for the whole log
-  entity.metadata = {{.key = "airframe", .value = airframe->airframe}, {.key = "board", .value = airframe->board}};
-  entity.models.push_back(model);
-
-  // The setpoint model: one entity per setpoint run, expiring shortly after the run's last sample.
-  // Each carries its own copy of the GLB (the 3D view caches the decoded mesh by content).
-  constexpr int64_t kSetpointLingerNs = 500'000'000;
-  std::vector<PJ::sdk::SceneEntity> entities;
-  entities.push_back(std::move(entity));
-  for (const auto& [start, end] : setpoint_runs)
-  {
-    PJ::sdk::SceneEntity ghost;
-    ghost.timestamp = start;
-    ghost.frame_id = "setpoint";
-    ghost.id = "setpoint_aircraft";
-    ghost.frame_locked = true;
-    ghost.lifetime_ns = end - start + kSetpointLingerNs;
-    ghost.models.push_back(model);
-    ghost.models.back().override_color = true;
-    ghost.models.back().color = {.r = 40, .g = 220, .b = 90, .a = 90};
-    entities.push_back(std::move(ghost));
-  }
-  std::stable_sort(entities.begin(), entities.end(),
-                   [](const PJ::sdk::SceneEntity& a, const PJ::sdk::SceneEntity& b) {
-                     return a.timestamp < b.timestamp;
-                   });
-
   const auto* object_host = objectWriteHost();
   if (object_host == nullptr)
   {
     return;  // host without an object store (publish_transforms already returned early then)
   }
-  auto topic = object_host->registerTopic(kModelTopic, PJ::sdk::BuiltinObjectType::kSceneEntities);
-  if (!topic)
-  {
-    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
-                                "ArduPilot Bin: cannot publish the 3D aircraft model: " + topic.error());
-    return;
-  }
-  // One message per timestamp, in time order.
-  const auto push = [&](PJ::Timestamp ts, const PJ::sdk::SceneEntities& message) {
-    const std::vector<uint8_t> bytes = PJ::serializeSceneEntities(message);
-    if (auto status = object_host->pushOwned(*topic, ts, PJ::Span<const uint8_t>(bytes.data(), bytes.size())); !status)
+  // Registers `topic_name` and pushes `messages` (time-ordered) on it; false after warning.
+  const auto publish = [&](const char* topic_name, const std::vector<std::pair<PJ::Timestamp, PJ::sdk::SceneEntities>>& messages) {
+    auto topic = object_host->registerTopic(topic_name, PJ::sdk::BuiltinObjectType::kSceneEntities);
+    if (!topic)
     {
       runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
-                                  "ArduPilot Bin: cannot publish the 3D aircraft model: " + status.error());
+                                  std::string("ArduPilot Bin: cannot publish ") + topic_name + ": " + topic.error());
       return false;
+    }
+    for (const auto& [ts, message] : messages)
+    {
+      const std::vector<uint8_t> bytes = PJ::serializeSceneEntities(message);
+      if (auto status = object_host->pushOwned(*topic, ts, PJ::Span<const uint8_t>(bytes.data(), bytes.size()));
+          !status)
+      {
+        runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
+                                    std::string("ArduPilot Bin: cannot publish ") + topic_name + ": " + status.error());
+        return false;
+      }
     }
     return true;
   };
-  const size_t entity_count = entities.size();
-  PJ::Timestamp last_ts = first_pose_ns;
-  for (size_t i = 0; i < entity_count;)
+
+  // The vehicle: one message, so the 3D view treats it as valid from the first pose on.
+  PJ::sdk::SceneEntities vehicle;
+  PJ::sdk::SceneEntity& aircraft = vehicle.entities.emplace_back();
+  aircraft.timestamp = first_pose_ns;
+  aircraft.frame_id = "vehicle";
+  aircraft.id = "aircraft";
+  aircraft.frame_locked = true;  // follows the vehicle frame; lifetime 0 = for the whole log
+  aircraft.metadata = {{.key = "airframe", .value = airframe->airframe}, {.key = "board", .value = airframe->board}};
+  aircraft.models.push_back(model);
+  if (!publish(kVehicleTopic, {{first_pose_ns, std::move(vehicle)}}))
   {
-    const PJ::Timestamp ts = entities[i].timestamp;
-    PJ::sdk::SceneEntities message;
-    for (; i < entity_count && entities[i].timestamp == ts; ++i)
-    {
-      message.entities.push_back(std::move(entities[i]));
-    }
-    if (!push(ts, message))
-    {
-      return;
-    }
-    last_ts = ts;
-  }
-  // The 3D view limits the playhead to a multi-message topic's first..last span (a single message
-  // counts as valid from then on). Close the topic at the last vehicle pose so that span is the
-  // whole flight, not just up to the last setpoint run's start. The closing message deletes the
-  // (by then already expired) setpoint model: an empty batch would serialize to no bytes, which
-  // the codec rejects.
-  if (entity_count > 1 && last_pose_ns > last_ts)
-  {
-    PJ::sdk::SceneEntities closing;
-    closing.deletions.push_back({.type = PJ::sdk::SceneEntityDeletion::Type::kMatchingId,
-                                 .timestamp = last_pose_ns,
-                                 .id = "setpoint_aircraft"});
-    if (!push(last_pose_ns, closing))
-    {
-      return;
-    }
+    return;
   }
   runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
                               std::string("ArduPilot Bin: 3D aircraft model ") + airframe->airframe + " (board " +
-                                  airframe->board + "), setpoint model in " + std::to_string(setpoint_runs.size()) +
-                                  " position-control periods");
+                                  airframe->board + ")");
+
+  // The setpoint: a translucent red copy, one message per setpoint run, expiring shortly after
+  // the run's last sample. Each message carries its own copy of the GLB (the 3D view caches the
+  // decoded mesh by content).
+  if (setpoint_runs.empty())
+  {
+    return;
+  }
+  constexpr int64_t kSetpointLingerNs = 500'000'000;
+  std::vector<std::pair<PJ::Timestamp, PJ::sdk::SceneEntities>> setpoint_messages;
+  for (const auto& [run_start, run_end] : setpoint_runs)
+  {
+    PJ::sdk::SceneEntities message;
+    PJ::sdk::SceneEntity& ghost = message.entities.emplace_back();
+    ghost.timestamp = run_start;
+    ghost.frame_id = "setpoint";
+    ghost.id = "setpoint";
+    ghost.frame_locked = true;
+    ghost.lifetime_ns = run_end - run_start + kSetpointLingerNs;
+    ghost.models.push_back(model);
+    ghost.models.back().override_color = true;
+    ghost.models.back().color = {.r = 230, .g = 40, .b = 40, .a = 45};
+    setpoint_messages.emplace_back(run_start, std::move(message));
+  }
+  // The 3D view limits the playhead to a multi-message topic's first..last span (a single message
+  // counts as valid from then on). Close the topic at the last vehicle pose so that span is the
+  // whole flight, not just up to the last run's start. The closing message deletes the (by then
+  // already expired) setpoint model: an empty batch would serialize to no bytes, which the codec
+  // rejects.
+  if (setpoint_messages.size() > 1 && last_pose_ns > setpoint_messages.back().first)
+  {
+    PJ::sdk::SceneEntities closing;
+    closing.deletions.push_back(
+        {.type = PJ::sdk::SceneEntityDeletion::Type::kMatchingId, .timestamp = last_pose_ns, .id = "setpoint"});
+    setpoint_messages.emplace_back(last_pose_ns, std::move(closing));
+  }
+  if (publish(kSetpointTopic, setpoint_messages))
+  {
+    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
+                                "ArduPilot Bin: 3D setpoint model in " + std::to_string(setpoint_runs.size()) +
+                                    " position-control periods");
+  }
 }
 
 

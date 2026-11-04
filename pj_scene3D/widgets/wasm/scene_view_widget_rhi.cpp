@@ -669,7 +669,8 @@ void SceneViewWidget::applyFollow() {
   }
   const auto transform = tf_->tryLookupTransform(fixed, follow_frame_, render_time_);
   if (!transform) {
-    follow_seeded_ = false;
+    // Hold through a lookup gap but keep the last known origin, so the camera
+    // stays locked on the frame when it reappears (mirrors the desktop view).
     return;
   }
   if (!follow_seeded_) {
@@ -2888,7 +2889,8 @@ void SceneViewWidget::render(QRhiCommandBuffer* command_buffer) {
           continue;
         }
         const Material fallback;
-        const Material& material = submesh.material != nullptr ? *submesh.material : fallback;
+        const Material& material =
+            submesh.material != nullptr && !call.replace_materials ? *submesh.material : fallback;
         ModelMaterialGpu& material_gpu = mesh.materials[index];
         const bool pbr_active = materialUsesPbrPath(material);
         bool use_material = call.use_material;
@@ -2907,7 +2909,8 @@ void SceneViewWidget::render(QRhiCommandBuffer* command_buffer) {
           opacity *= shading_params_.collision_opacity;
         }
         tint.a *= opacity;
-        const bool use_texture = material_gpu.textures[kBaseColorSlot].present && (pbr_active || use_material);
+        const bool use_texture = !call.replace_materials && material_gpu.textures[kBaseColorSlot].present &&
+                                 (pbr_active || use_material);
         float alpha_mode = 0.0F;
         if ((pbr_active || use_material) && material.alpha_mode == AlphaMode::kMask) {
           alpha_mode = 1.0F;

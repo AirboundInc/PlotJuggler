@@ -838,6 +838,9 @@ TEST(SceneEntitiesLayerModelTest, FrameCompositionAppliesTfPrimitivePoseAndScale
   expectMatrixNear(draws.front().model, expected);
   EXPECT_EQ(draws.front().kind, pj::scene3d::MeshRenderPass::GeometryKind::kMesh);
   EXPECT_FALSE(draws.front().use_vertex_color);
+  // override_color REPLACES the model's materials: a textured material must not
+  // multiply the tint (else only untextured parts show the color).
+  EXPECT_TRUE(draws.front().replace_materials);
   EXPECT_NEAR(draws.front().color.r, 25.0f / 255.0f, 1e-6f);
   EXPECT_NEAR(draws.front().color.g, 51.0f / 255.0f, 1e-6f);
   EXPECT_NEAR(draws.front().color.b, 76.0f / 255.0f, 1e-6f);
@@ -1234,6 +1237,56 @@ TEST(SceneEntitiesLayerModelTest, CrossBatchDeleteAllErasesOlderBatchEntities) {
   layer.setTrackerTime(PJ::fromRaw(25));
 
   EXPECT_TRUE(layer.currentEntities().empty()) << "kAll deletion in a subsequent batch did not erase earlier entities";
+}
+
+// A data-source-shaped topic: a permanent model, a ghost model republished per
+// active run with a finite lifetime, and a closing matching-id deletion. Large
+// random scrubs in both directions (incremental forward replay, cache re-folds,
+// full rebuilds) must always leave exactly the entities a fresh fold would.
+TEST(SceneEntitiesLayerModelTest, RandomLargeScrubsMatchFreshFold) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+
+  PJ::sdk::SceneEntity ghost_a = makeEntity("ghost", 90, "setpoint");
+  ghost_a.lifetime_ns = 50;
+  pushSceneEntities(session, topic_id, 90, batchWithEntities({ghost_a}));
+  pushSceneEntities(session, topic_id, 100, batchWithEntities({makeEntity("aircraft", 100, "vehicle")}));
+  PJ::sdk::SceneEntity ghost_b = makeEntity("ghost", 500, "setpoint");
+  ghost_b.lifetime_ns = 300;
+  pushSceneEntities(session, topic_id, 500, batchWithEntities({ghost_b}));
+  pushSceneEntities(
+      session, topic_id, 1000,
+      batchWithDeletions({{.type = PJ::sdk::SceneEntityDeletion::Type::kMatchingId, .timestamp = 1000, .id = "ghost"}}));
+
+  const auto expected = [](int64_t t) {
+    std::vector<std::string> ids;
+    if (t >= 100) {
+      ids.emplace_back("aircraft");
+    }
+    if ((t >= 90 && t <= 140) || (t >= 500 && t <= 800)) {
+      ids.emplace_back("ghost");
+    }
+    return ids;
+  };
+  const auto ids_of = [](const pj::scene3d::SceneEntitiesLayer& layer) {
+    std::vector<std::string> ids;
+    for (const auto& [id, entity] : layer.currentEntities()) {
+      ids.push_back(id);
+    }
+    return ids;
+  };
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  uint64_t state = 12345;
+  for (int step = 0; step < 2000; ++step) {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    const int64_t t = 80 + static_cast<int64_t>((state >> 33) % 1050);
+    layer.setTrackerTime(PJ::fromRaw(t));
+    ASSERT_EQ(ids_of(layer), expected(t)) << "step " << step << " t=" << t;
+  }
 }
 
 // The shared main supplies the event loop for QFutureWatcher/UrlFetcher, and the

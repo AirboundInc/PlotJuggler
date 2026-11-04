@@ -119,7 +119,7 @@ constant (472 335.072 s, ±256 ns double rounding).
   (x = east, y = north, z = up); attitude is `Roll/Pitch/Yaw` converted from body FRD in NED to
   body FLU in ENU (REP-103), so the frame's x axis is the nose. Checked on AA-TRT-0051 with
   `apbin_dump` (`OBJECT`/`TF` lines): 5652 transforms, translation and heading match the raw XKF1
-  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_3D/model` (or `_3D/frames`) onto an empty
+  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_3D/vehicle` (or `_3D/frames`) onto an empty
   plot area to open a 3D view, then right-click the `vehicle` frame for "Create trail" and "Follow
   this frame" (also in the 3D settings panel: Create Trail, Follow frame, Frames size).
 - **Position setpoint for the 3D view (2026-10-26).** Same `_3D/frames` topic (all transforms merged in time
@@ -136,7 +136,7 @@ constant (472 335.072 s, ±256 ns double rounding).
   the 3D view holds the last setpoint through fixed-wing flight. Checked on AA-TRT-0051:
   `TFEDGES _TF ordered=yes world->setpoint=2868 world->vehicle=5652`, values equal to the raw
   PSC fields.
-- **Aircraft model for the 3D view (2026-11-02).** Object topic `_3D/model` (`kSceneEntities`; `_MODEL` until 2026-11-03): one
+- **Aircraft model for the 3D view (2026-11-02).** Object topic `_3D/vehicle` (`kSceneEntities`; `_MODEL` until 2026-11-03, `_3D/model` until 2026-11-04): one
   entity `aircraft`, `frame_locked` to `vehicle`, lifetime 0, published at the first vehicle pose,
   holding the airframe's GLB as an inline `ModelPrimitive` (`model/gltf-binary`).
   - Airframe from the board name in the boot messages (first word of a MSG):
@@ -154,14 +154,17 @@ constant (472 335.072 s, ±256 ns double rounding).
     the frame origin; bounds come from the GLB's POSITION accessor min/max with node transforms.
   - Checked on AA-TRT-0051 (board `Pixhawk6C-bdshot`): `MODEL ... id=aircraft frame=vehicle
     locked=1 lifetime=0 airframe=TRT ... scale=3.575` (1.398 m span).
-  - Setpoint model (2026-11-03): the same GLB, entity `setpoint_aircraft` locked to `setpoint`,
-    `override_color` translucent green (40, 220, 90, alpha 90). One entity per setpoint run (a gap
-    over 1 s ends a run), lifetime = run length + 0.5 s, so it is hidden through fixed-wing flight.
-    Each message carries its own GLB copy. A last message at the final vehicle pose deletes
-    `setpoint_aircraft`: the 3D view limits the playhead to a multi-message topic's first..last
-    span, so without it the model froze at the last run's start (a lone message counts as valid
-    from then on, which is why the aircraft-only topic never hit this). It is a deletion because an
-    empty batch serializes to no bytes and the codec rejects that. AA-TRT-0051: 2 runs,
-    `_3D/model count=4`, t1 = the last vehicle pose.
+  - Setpoint model (2026-11-03; own topic since 2026-11-04 so it can be hidden and given its own
+    opacity): object topic `_3D/setpoint`, the same GLB, entity `setpoint` locked to the
+    `setpoint` frame, `override_color` translucent red (230, 40, 40, alpha 45; the 3D view draws
+    an overridden model with a plain material, so the colour covers textured parts too). One
+    message per setpoint run (a gap over 1 s ends a run), lifetime = run length + 0.5 s, so it is
+    hidden through fixed-wing flight. Each message carries its own GLB copy. With more than one
+    run, a last message at the final vehicle pose deletes `setpoint`: the 3D view limits the
+    playhead to a multi-message topic's first..last span, so without it the view froze at the last
+    run's start (a lone message counts as valid from then on, which is why `_3D/vehicle` is one
+    message). It is a deletion because an empty batch serializes to no bytes and the codec rejects
+    that. AA-TRT-0051: `_3D/vehicle count=1`, `_3D/setpoint count=3` (2 runs), t1 = the last
+    vehicle pose.
   - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
     servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`) and terrain.

@@ -362,9 +362,13 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   (`setFollowFrame`, "" = off) and applies it each tracker tick in `applyFollow`:
   look up the target's origin in the fixed frame at `render_time_`, and shift the
   camera by the delta against the previous tick's origin (`follow_prev_origin_`).
-  The first tick after enabling / a fixed-frame change / a lookup gap only *seeds*
-  the baseline (no shift), so enabling never jumps and the user's orbit/zoom/pan is
-  preserved (follow only *adds* the target's motion). `followRenderKey(time)` hashes
+  The first tick after enabling / a fixed-frame change only *seeds* the baseline (no
+  shift), so enabling never jumps and the user's orbit/zoom/pan is preserved (follow
+  only *adds* the target's motion). A lookup gap (the target unresolvable at this
+  time, e.g. scrubbed before its first sample) holds the camera but keeps the last
+  known origin, so when the target reappears — possibly far away — the camera catches
+  up by its motion and stays locked on; only a target never resolved yet seeds on
+  appearance. `followRenderKey(time)` hashes
   the followed origin into the dock's `viewRenderKey` so a moving target isn't
   coalesced away by the repaint gate even when the TF overlay is hidden. The UI is
   the "Camera" section's **Follow frame** picker in `Scene3DConfigPanel`, with a

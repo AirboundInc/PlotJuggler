@@ -469,6 +469,7 @@ std::vector<MeshRenderPass::DrawCall> SceneEntitiesLayer::modelDrawCallsForFrame
       if (primitive.override_color) {
         draw.color = toVec4(primitive.color);
         draw.use_vertex_color = false;
+        draw.replace_materials = true;  // override_color replaces the model's materials
       } else {
         draw.color = glm::vec4(1.0f);
         draw.use_vertex_color = true;
