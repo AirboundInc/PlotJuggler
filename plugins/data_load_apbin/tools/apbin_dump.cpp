@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -417,6 +418,15 @@ int main(int argc, char** argv) {
                         model.media_type.c_str(), model.data.size(), model.scale.x, model.pose.position.x,
                         model.pose.position.y, model.pose.position.z, model.pose.orientation.x,
                         model.pose.orientation.y, model.pose.orientation.z, model.pose.orientation.w);
+            // APBIN_DUMP_MODELS_DIR: also write each inline model to <dir>/<entity id>.glb for inspection.
+            if (const char* dir = std::getenv("APBIN_DUMP_MODELS_DIR"); dir != nullptr && *dir != '\0' &&
+                                                                         !model.data.empty()) {
+              const std::string path = std::string(dir) + "/" + entity.id + ".glb";
+              if (std::FILE* file = std::fopen(path.c_str(), "wb")) {
+                std::fwrite(model.data.data(), 1, model.data.size(), file);
+                std::fclose(file);
+              }
+            }
           }
           std::printf("\n");
         }

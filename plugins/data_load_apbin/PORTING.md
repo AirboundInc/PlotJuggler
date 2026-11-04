@@ -167,4 +167,34 @@ constant (472 335.072 s, ±256 ns double rounding).
     that. AA-TRT-0051: `_3D/vehicle count=1`, `_3D/setpoint count=3` (2 runs), t1 = the last
     vehicle pose.
   - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
-    servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`) and terrain.
+    servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`).
+- **Terrain for the 3D view (2026-11-04).** Object topic `_3D/terrain` (`kSceneEntities`): one
+  entity `terrain` on `world`, published at the first vehicle pose, holding a GLB built in memory
+  by `terrain.{h,cpp}`: satellite imagery draped over an elevation model around the flight.
+  - Sources (as in the Airbound web log viewer): ESRI World Imagery tiles (JPEG) and AWS Terrain
+    Tiles in Terrarium encoding (PNG, `R*256 + G + B/256 - 32768` metres above sea level). The
+    entity's metadata carries the attributions.
+  - Placement: the EKF origin from the first `ORGN` of type 0 (Lat/Lng in 1e-7 degrees unless FMTU
+    scaled them, Alt in metres AMSL), the point XKF1 positions are relative to. Lat/lon map to
+    east/north with ArduPilot's own scale (`LATLON_TO_M`, longitude scaled by the cosine of the
+    mean latitude), heights are `elevation - ORGN.Alt`. No ORGN: info message, no terrain.
+  - Area: the vehicle poses' bounding box plus max(150 m, 25 %). Imagery zoom for about 8 tiles
+    across (at most 144 tiles, zoom 10-19), elevation zoom min(imagery, 14) (Terrarium is
+    unreliable above 14). One patch per imagery tile: a 17x17 grid sampled bilinearly from the
+    elevation, textured with the tile's JPEG as downloaded (no image decoding). glTF axes
+    (east, up, -north), which the 3D view's Y-up to Z-up import turns into ENU.
+  - Downloads: libcurl (static, TLS via OpenSSL), 8 in parallel, 5 s connect / 20 s total
+    timeout. Certificates: the Windows certificate store; on Linux `SSL_CERT_FILE`, else the
+    first CA bundle found among the Debian, Fedora, openSUSE and Alpine locations, since the
+    path compiled into libcurl is the build machine's. Only tiles missing from the cache are
+    downloaded; they are kept forever under `AIRBOUND_TILE_CACHE_DIR`, else
+    `%LOCALAPPDATA%\Airbound\PlotJuggler\tiles` (`$XDG_CACHE_HOME/airbound/plotjuggler/tiles`,
+    default `~/.cache/...`, on Linux). The first tile is fetched alone; if it gets no answer
+    the rest use the cache only, so an offline load waits for one timeout.
+    `AIRBOUND_TERRAIN=0` skips terrain.
+  - Checked on AA-TRT-0051: 130 imagery tiles (zoom 19), 2 elevation tiles (zoom 14), 2.7 MB GLB;
+    first load 8.5 s (132 downloads), cached 81 ms. Vertically the terrain at the origin is
+    5.4 m below `ORGN.Alt`, and the vehicle at landing (XKF1 z = -8.1 m) is 2.8 m below the
+    terrain: GPS altitude, the elevation data (surface model, ~10 m pixels) and the EKF's height
+    drift disagree by a few metres.
+  - `apbin_dump` with `APBIN_DUMP_MODELS_DIR=<dir>` writes every inline model to `<dir>/<id>.glb`.

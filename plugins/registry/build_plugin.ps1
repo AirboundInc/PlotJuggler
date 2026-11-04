@@ -4,9 +4,9 @@
   Build one in-tree Airbound plugin on its own and package it as a marketplace ZIP.
 
 .DESCRIPTION
-  Builds plugins/ standalone (no Qt, no app): a two-line Conan graph holding
-  plotjuggler_sdk and nlohmann_json at exactly the pins of the root
-  conanfile.txt (and conan.lock), the same MSVC 2022 toolchain and Conan
+  Builds plugins/ standalone (no Qt, no app): a small Conan graph holding
+  plotjuggler_sdk, nlohmann_json, libcurl and libpng at exactly the pins of the
+  root conanfile.txt (and conan.lock), the same MSVC 2022 toolchain and Conan
   settings as build.bat, then a Release build of plugins/.
 
   The ZIP has the layout of the official plugin archives:
@@ -61,13 +61,14 @@ Enable-PjMsvc2022Env
 Assert-PjBuildTools
 Register-PjConanRemote
 
-# Only the plugin SDK and nlohmann_json, copied from the app's conanfile.txt so
-# the plugin can never drift from the SDK the app pins.
+# Only what the plugins link, copied from the app's conanfile.txt so the plugin
+# can never drift from the SDK (or the libraries) the app pins.
+$pluginDeps = @('plotjuggler_sdk', 'nlohmann_json', 'libcurl', 'libpng')
 $requires = @(Get-Content -LiteralPath (Join-Path $PjRepoRoot 'conanfile.txt') |
-              Where-Object { $_ -match '^\s*(plotjuggler_sdk|nlohmann_json)/' } |
-              ForEach-Object { $_.Trim() })
-if ($requires.Count -ne 2) {
-  Write-Err 'conanfile.txt must pin plotjuggler_sdk and nlohmann_json exactly once each'
+              Where-Object { $_ -match ('^\s*(' + ($pluginDeps -join '|') + ')/') } |
+              ForEach-Object { ($_ -replace '#.*$', '').Trim() })
+if ($requires.Count -ne $pluginDeps.Count) {
+  Write-Err ('conanfile.txt must pin each of ' + ($pluginDeps -join ', ') + ' exactly once')
   exit 1
 }
 $conanfile = "[requires]`r`n" + ($requires -join "`r`n") + "`r`n`r`n[generators]`r`nCMakeDeps`r`nCMakeToolchain`r`n"
