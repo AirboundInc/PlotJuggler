@@ -148,18 +148,25 @@ PJ::sdk::Quaternion quaternion_from_matrix(const double m[3][3]);
 // Vehicle pose for the 3D view. ArduPilot logs attitude as body FRD relative to NED (Euler ZYX,
 // degrees); the 3D view uses ROS conventions (world ENU, body FLU, REP-103). With T the NED->ENU
 // swap and S the FLU->FRD flip, R_enu_flu = T * Rz(yaw) Ry(pitch) Rx(roll) * S.
-PJ::sdk::Quaternion enu_flu_quaternion(double roll_deg, double pitch_deg, double yaw_deg)
+constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+
+// Body FRD -> NED rotation matrix from ArduPilot's ZYX Euler angles (degrees).
+void ned_frd_matrix(double roll_deg, double pitch_deg, double yaw_deg, double ned[3][3])
 {
-  constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
   const double cr = std::cos(roll_deg * kDegToRad), sr = std::sin(roll_deg * kDegToRad);
   const double cp = std::cos(pitch_deg * kDegToRad), sp = std::sin(pitch_deg * kDegToRad);
   const double cy = std::cos(yaw_deg * kDegToRad), sy = std::sin(yaw_deg * kDegToRad);
-  // Body FRD -> NED.
-  const double ned[3][3] = {
+  const double m[3][3] = {
       {cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr},
       {sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr},
       {-sp, cp * sr, cp * cr},
   };
+  std::memcpy(ned, m, sizeof(m));
+}
+
+// R_enu_flu = T * ned * S for a body FRD -> NED matrix.
+PJ::sdk::Quaternion enu_flu_quaternion(const double ned[3][3])
+{
   // T swaps rows 0/1 and negates row 2; S negates columns 1 and 2.
   double m[3][3];
   const int row_of[3] = {1, 0, 2};
@@ -173,6 +180,36 @@ PJ::sdk::Quaternion enu_flu_quaternion(double roll_deg, double pitch_deg, double
     }
   }
   return quaternion_from_matrix(m);
+}
+
+PJ::sdk::Quaternion enu_flu_quaternion(double roll_deg, double pitch_deg, double yaw_deg)
+{
+  double ned[3][3];
+  ned_frd_matrix(roll_deg, pitch_deg, yaw_deg, ned);
+  return enu_flu_quaternion(ned);
+}
+
+// The attitude controller's target as a body FRD -> NED matrix. On a quadplane in VTOL the
+// controller (and ATT's Des* fields) work in an AHRS view rotated from the body by
+// rot_view = Ry(view_pitch_deg), i.e. R_view = R_body * rot_view^T, so R_body = R_view * rot_view.
+// view_pitch_deg is 90 for a tailsitter plus Q_TRIM_PITCH (AP_AHRS_View, quadplane.cpp).
+void target_body_matrix(double roll_deg, double pitch_deg, double yaw_deg, double view_pitch_deg, double out[3][3])
+{
+  double view[3][3];
+  ned_frd_matrix(roll_deg, pitch_deg, yaw_deg, view);
+  const double c = std::cos(view_pitch_deg * kDegToRad), s = std::sin(view_pitch_deg * kDegToRad);
+  const double rot_view[3][3] = {{c, 0.0, s}, {0.0, 1.0, 0.0}, {-s, 0.0, c}};
+  for (int r = 0; r < 3; ++r)
+  {
+    for (int col = 0; col < 3; ++col)
+    {
+      out[r][col] = 0.0;
+      for (int k = 0; k < 3; ++k)
+      {
+        out[r][col] += view[r][k] * rot_view[k][col];
+      }
+    }
+  }
 }
 
 // The Airbound aircraft models are Blender glTF exports: nose towards -Z, right wing +X, up +Y.
@@ -568,8 +605,11 @@ private:
   double centi_factor(const std::string& msg_name, uint8_t field_idx);
 
   // The model topic (kModelTopic): the detected airframe's GLB model as a scene entity locked to the
-  // vehicle frame, from `first_pose_ns` on. Problems only warn; the load still succeeds.
-  void publish_vehicle_model(PJ::Timestamp first_pose_ns);
+  // vehicle frame over [first_pose_ns, last_pose_ns], plus a translucent copy on the setpoint frame
+  // shown only during each [start, end] run in `setpoint_runs`. Problems only warn; the load still
+  // succeeds.
+  void publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
+                             const std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>>& setpoint_runs);
 
   // fill the message_data for a message according to the message format
   void handle_message_received(const struct log_Format& fmt, const uint8_t* msg);
@@ -1492,13 +1532,36 @@ PJ::Status APBinSource::publish_transforms()
   });
   if (first_vehicle != transforms.end())
   {
-    publish_vehicle_model(first_vehicle->timestamp);
+    // Setpoints are logged only while the position controller runs; a gap longer than this
+    // ends a run, and the setpoint model is hidden until the next one.
+    constexpr PJ::Timestamp kRunGapNs = 1'000'000'000;
+    std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>> setpoint_runs;
+    for (const PJ::sdk::FrameTransform& tf : transforms)
+    {
+      if (tf.child_frame_id != "setpoint")
+      {
+        continue;
+      }
+      if (setpoint_runs.empty() || tf.timestamp - setpoint_runs.back().second > kRunGapNs)
+      {
+        setpoint_runs.emplace_back(tf.timestamp, tf.timestamp);
+      }
+      else
+      {
+        setpoint_runs.back().second = tf.timestamp;
+      }
+    }
+    const auto last_vehicle = std::find_if(transforms.rbegin(), transforms.rend(), [](const PJ::sdk::FrameTransform& tf) {
+      return tf.child_frame_id == "vehicle";
+    });
+    publish_vehicle_model(first_vehicle->timestamp, last_vehicle->timestamp, setpoint_runs);
   }
   return PJ::okStatus();
 }
 
 
-void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns)
+void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
+                                        const std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>>& setpoint_runs)
 {
   // Airframe from the board name ArduPilot prints at boot: the first word of that message.
   const AirframeModel* airframe = nullptr;
@@ -1572,9 +1635,30 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns)
   entity.id = "aircraft";
   entity.frame_locked = true;  // follows the vehicle frame; lifetime 0 = for the whole log
   entity.metadata = {{.key = "airframe", .value = airframe->airframe}, {.key = "board", .value = airframe->board}};
-  entity.models.push_back(std::move(model));
-  PJ::sdk::SceneEntities message;
-  message.entities.push_back(std::move(entity));
+  entity.models.push_back(model);
+
+  // The setpoint model: one entity per setpoint run, expiring shortly after the run's last sample.
+  // Each carries its own copy of the GLB (the 3D view caches the decoded mesh by content).
+  constexpr int64_t kSetpointLingerNs = 500'000'000;
+  std::vector<PJ::sdk::SceneEntity> entities;
+  entities.push_back(std::move(entity));
+  for (const auto& [start, end] : setpoint_runs)
+  {
+    PJ::sdk::SceneEntity ghost;
+    ghost.timestamp = start;
+    ghost.frame_id = "setpoint";
+    ghost.id = "setpoint_aircraft";
+    ghost.frame_locked = true;
+    ghost.lifetime_ns = end - start + kSetpointLingerNs;
+    ghost.models.push_back(model);
+    ghost.models.back().override_color = true;
+    ghost.models.back().color = {.r = 40, .g = 220, .b = 90, .a = 90};
+    entities.push_back(std::move(ghost));
+  }
+  std::stable_sort(entities.begin(), entities.end(),
+                   [](const PJ::sdk::SceneEntity& a, const PJ::sdk::SceneEntity& b) {
+                     return a.timestamp < b.timestamp;
+                   });
 
   const auto* object_host = objectWriteHost();
   if (object_host == nullptr)
@@ -1588,17 +1672,53 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns)
                                 "ArduPilot Bin: cannot publish the 3D aircraft model: " + topic.error());
     return;
   }
-  const std::vector<uint8_t> bytes = PJ::serializeSceneEntities(message);
-  if (auto status = object_host->pushOwned(*topic, first_pose_ns, PJ::Span<const uint8_t>(bytes.data(), bytes.size()));
-      !status)
+  // One message per timestamp, in time order.
+  const auto push = [&](PJ::Timestamp ts, const PJ::sdk::SceneEntities& message) {
+    const std::vector<uint8_t> bytes = PJ::serializeSceneEntities(message);
+    if (auto status = object_host->pushOwned(*topic, ts, PJ::Span<const uint8_t>(bytes.data(), bytes.size())); !status)
+    {
+      runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
+                                  "ArduPilot Bin: cannot publish the 3D aircraft model: " + status.error());
+      return false;
+    }
+    return true;
+  };
+  const size_t entity_count = entities.size();
+  PJ::Timestamp last_ts = first_pose_ns;
+  for (size_t i = 0; i < entity_count;)
   {
-    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
-                                "ArduPilot Bin: cannot publish the 3D aircraft model: " + status.error());
-    return;
+    const PJ::Timestamp ts = entities[i].timestamp;
+    PJ::sdk::SceneEntities message;
+    for (; i < entity_count && entities[i].timestamp == ts; ++i)
+    {
+      message.entities.push_back(std::move(entities[i]));
+    }
+    if (!push(ts, message))
+    {
+      return;
+    }
+    last_ts = ts;
+  }
+  // The 3D view limits the playhead to a multi-message topic's first..last span (a single message
+  // counts as valid from then on). Close the topic at the last vehicle pose so that span is the
+  // whole flight, not just up to the last setpoint run's start. The closing message deletes the
+  // (by then already expired) setpoint model: an empty batch would serialize to no bytes, which
+  // the codec rejects.
+  if (entity_count > 1 && last_pose_ns > last_ts)
+  {
+    PJ::sdk::SceneEntities closing;
+    closing.deletions.push_back({.type = PJ::sdk::SceneEntityDeletion::Type::kMatchingId,
+                                 .timestamp = last_pose_ns,
+                                 .id = "setpoint_aircraft"});
+    if (!push(last_pose_ns, closing))
+    {
+      return;
+    }
   }
   runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
                               std::string("ArduPilot Bin: 3D aircraft model ") + airframe->airframe + " (board " +
-                                  airframe->board + ")");
+                                  airframe->board + "), setpoint model in " + std::to_string(setpoint_runs.size()) +
+                                  " position-control periods");
 }
 
 
@@ -1727,9 +1847,10 @@ void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransfor
   // The position controller logs its target position per axis (metres north/east/down from the
   // EKF origin, the same frame as XKF1) while it runs, i.e. in VTOL / multicopter position
   // control; fixed-wing flight logs none. The three messages are written in the same loop, so
-  // each PSCN sample is paired with the nearest PSCE and PSCD samples. A position setpoint has no
-  // attitude: the frame keeps the world orientation. Between active periods the 3D view holds
-  // the last setpoint.
+  // each PSCN sample is paired with the nearest PSCE and PSCD samples. The frame's orientation is
+  // the attitude controller's target (ATT Des*) converted from the controller's AHRS view to the
+  // body; with no ATT sample nearby it keeps the world orientation. Between active periods the
+  // 3D view holds the last setpoint.
   struct Axis
   {
     const char* msg;
@@ -1738,13 +1859,11 @@ void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransfor
     const std::vector<double>* values = nullptr;
     double factor = 1.0;
   };
-  Axis axes[] = {{"PSCN", "TPN"}, {"PSCE", "TPE"}, {"PSCD", "TPD"}};
-  for (Axis& axis : axes)
-  {
+  const auto bind = [this](Axis& axis) {
     const auto msg_it = messages_map.find(axis.msg);
     if (msg_it == messages_map.end() || msg_it->second.empty())
     {
-      return;  // no position controller output in this log
+      return false;
     }
     const message_data& data = msg_it->second.begin()->second;
     const auto& name2idx = field_name2idx[axis.msg];
@@ -1753,21 +1872,42 @@ void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransfor
     if (time_it == name2idx.end() || value_it == name2idx.end() || time_it->second >= data.size() ||
         value_it->second >= data.size())
     {
-      return;
+      return false;
     }
     axis.times = &data[time_it->second].second;
     axis.values = &data[value_it->second].second;
     axis.factor = centi_factor(axis.msg, value_it->second);
+    return true;
+  };
+  Axis axes[] = {{"PSCN", "TPN"}, {"PSCE", "TPE"}, {"PSCD", "TPD"}};
+  for (Axis& axis : axes)
+  {
+    if (!bind(axis))
+    {
+      return;  // no position controller output in this log
+    }
   }
+  Axis attitude[] = {{"ATT", "DesRoll"}, {"ATT", "DesPitch"}, {"ATT", "DesYaw"}};
+  bool has_attitude = true;
+  for (Axis& axis : attitude)
+  {
+    has_attitude = has_attitude && bind(axis);
+  }
+  const auto param = [this](const char* name, double fallback) {
+    const auto it = log_parameters.find(name);
+    return it != log_parameters.end() ? static_cast<double>(it->second) : fallback;
+  };
+  const double view_pitch_deg = (param("Q_TAILSIT_ENABLE", 0.0) > 0.0 ? 90.0 : 0.0) + param("Q_TRIM_PITCH", 0.0);
 
-  // Value of `axis` at its sample nearest to t, if one lies within the pairing window.
-  constexpr double kMaxSkewS = 0.005;
-  const auto nearest = [](const Axis& axis, double t) -> std::optional<double> {
+  // Value of `axis` at its sample nearest to t, if one lies within max_skew_s.
+  constexpr double kMaxSkewS = 0.005;     // PSC axes are written together
+  constexpr double kMaxAttSkewS = 0.1;    // ATT is logged at its own rate
+  const auto nearest = [](const Axis& axis, double t, double max_skew_s) -> std::optional<double> {
     const size_t n = std::min(axis.times->size(), axis.values->size());
     const auto begin = axis.times->begin();
     const auto it = std::lower_bound(begin, begin + static_cast<std::ptrdiff_t>(n), t);
     size_t best = n;
-    double best_gap = kMaxSkewS;
+    double best_gap = max_skew_s;
     for (auto candidate : {it, it == begin ? it : std::prev(it)})
     {
       const auto k = static_cast<size_t>(candidate - begin);
@@ -1790,8 +1930,8 @@ void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransfor
   {
     const double t = (*north_axis.times)[i];
     const double north = (*north_axis.values)[i] * north_axis.factor;
-    const std::optional<double> east = nearest(axes[1], t);
-    const std::optional<double> down = nearest(axes[2], t);
+    const std::optional<double> east = nearest(axes[1], t, kMaxSkewS);
+    const std::optional<double> down = nearest(axes[2], t, kMaxSkewS);
     if (!east || !down || !std::isfinite(north) || !std::isfinite(*east) || !std::isfinite(*down))
     {
       continue;
@@ -1801,6 +1941,18 @@ void APBinSource::collect_setpoint_transforms(std::vector<PJ::sdk::FrameTransfor
     tf.parent_frame_id = "world";
     tf.child_frame_id = "setpoint";
     tf.translation = {.x = *east, .y = north, .z = -*down};
+    if (has_attitude)
+    {
+      const std::optional<double> roll = nearest(attitude[0], t, kMaxAttSkewS);
+      const std::optional<double> pitch = nearest(attitude[1], t, kMaxAttSkewS);
+      const std::optional<double> yaw = nearest(attitude[2], t, kMaxAttSkewS);
+      if (roll && pitch && yaw && std::isfinite(*roll) && std::isfinite(*pitch) && std::isfinite(*yaw))
+      {
+        double body[3][3];
+        target_body_matrix(*roll, *pitch, *yaw, view_pitch_deg, body);
+        tf.rotation = enu_flu_quaternion(body);
+      }
+    }
     out.push_back(std::move(tf));
   }
 }

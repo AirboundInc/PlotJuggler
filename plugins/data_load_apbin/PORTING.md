@@ -125,7 +125,12 @@ constant (472 335.072 s, ±256 ns double rounding).
 - **Position setpoint for the 3D view (2026-10-26).** Same `_3D/frames` topic (all transforms merged in time
   order), frame `world -> setpoint`: the position controller's target `PSCN.TPN` / `PSCE.TPE` /
   `PSCD.TPD` (metres north/east/down from the EKF origin, the same frame as XKF1), converted to ENU
-  like the vehicle, with identity rotation (a position setpoint has no attitude). Driven by PSCN's
+  like the vehicle. Rotation (2026-11-03): the attitude controller's target, `ATT.DesRoll` /
+  `DesPitch` / `DesYaw` nearest within 0.1 s, identity when none. In VTOL these are angles of the
+  quadplane's AHRS view, not the body (`Write_AttitudeView`): the view is the body rotated by
+  `Ry(y_angle + Q_TRIM_PITCH)`, `y_angle` 90 for a tailsitter (`Q_TAILSIT_ENABLE` > 0), so the
+  target body attitude is `R_des * Ry(...)` (AP_AHRS_View.cpp, quadplane.cpp `create_view`). ATT's
+  actual Roll/Pitch/Yaw are view angles too (so unusable for the vehicle; XKF1 is). Driven by PSCN's
   timestamps; PSCE/PSCD are paired by nearest sample within 5 ms (the three are logged in the same
   loop, ~10 us apart). Only logged while the position controller runs (VTOL / multicopter), so
   the 3D view holds the last setpoint through fixed-wing flight. Checked on AA-TRT-0051:
@@ -149,5 +154,14 @@ constant (472 335.072 s, ±256 ns double rounding).
     the frame origin; bounds come from the GLB's POSITION accessor min/max with node transforms.
   - Checked on AA-TRT-0051 (board `Pixhawk6C-bdshot`): `MODEL ... id=aircraft frame=vehicle
     locked=1 lifetime=0 airframe=TRT ... scale=3.575` (1.398 m span).
+  - Setpoint model (2026-11-03): the same GLB, entity `setpoint_aircraft` locked to `setpoint`,
+    `override_color` translucent green (40, 220, 90, alpha 90). One entity per setpoint run (a gap
+    over 1 s ends a run), lifetime = run length + 0.5 s, so it is hidden through fixed-wing flight.
+    Each message carries its own GLB copy. A last message at the final vehicle pose deletes
+    `setpoint_aircraft`: the 3D view limits the playhead to a multi-message topic's first..last
+    span, so without it the model froze at the last run's start (a lone message counts as valid
+    from then on, which is why the aircraft-only topic never hit this). It is a deletion because an
+    empty batch serializes to no bytes and the codec rejects that. AA-TRT-0051: 2 runs,
+    `_3D/model count=4`, t1 = the last vehicle pose.
   - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
     servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`) and terrain.
