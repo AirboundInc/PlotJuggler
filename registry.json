@@ -369,6 +369,50 @@
       }
     },
     {
+      "id": "influx-parser",
+      "name": "InfluxDB Line Protocol Parser",
+      "version": "0.1.0",
+      "description": "Message parser for InfluxDB line protocol, the text format Telegraf and InfluxDB clients send.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "message_parser",
+      "tags": [
+        "influx",
+        "influxdb",
+        "telegraf",
+        "line_protocol",
+        "parser"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.34.1",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_influx/v0.1.0/influx-parser-0.1.0-linux-aarch64.zip",
+          "checksum": "sha256:0a81055ec507ec18ffea642f24a6ac8b5d8ee0d15527c6264334474043889419"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_influx/v0.1.0/influx-parser-0.1.0-linux-x86_64.zip",
+          "checksum": "sha256:0548c7915b9c9d99998b71f1b5aca1437f737f7622df989b3977f9e0999054c0"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_influx/v0.1.0/influx-parser-0.1.0-macos-arm64.zip",
+          "checksum": "sha256:734d2753bb46e3d82e3fe8df3b4230064d97b4cbde3ae9b54c48ff7f75d33c87"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_influx/v0.1.0/influx-parser-0.1.0-windows-arm64.zip",
+          "checksum": "sha256:2a3fd5c75087c4097570c81f71bdd8f1b49c8ba3c56d99bbaf0a64e11cbe47aa"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_influx/v0.1.0/influx-parser-0.1.0-windows-x64.zip",
+          "checksum": "sha256:64de903ac116594fbce080b52e19a47f83aa72951934d1a97f97f63269833c85"
+        }
+      }
+    },
+    {
       "id": "json-parser",
       "name": "JSON Parser",
       "version": "1.3.0",
@@ -1318,7 +1362,7 @@
     {
       "id": "ulog-loader",
       "name": "ULog Loader",
-      "version": "1.1.2",
+      "version": "1.2.0",
       "description": "Data loader for PX4 ULog files. Flight log format for PX4 autopilot.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1339,24 +1383,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-linux-aarch64.zip",
-          "checksum": "sha256:8c63566cbffea58091485b95a5e126b64f921a86b7996b91ab1d1f1e2f6cc361"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.2.0/ulog-loader-1.2.0-linux-aarch64.zip",
+          "checksum": "sha256:f55fac825d909c3552dd9431daa45a590ae8db7a7ce6c3fad572e0e68736bad6"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-linux-x86_64.zip",
-          "checksum": "sha256:739069ca73d5f3c5f43492ecbf0f45dce63b87775775cf9b95331344e2880a4d"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.2.0/ulog-loader-1.2.0-linux-x86_64.zip",
+          "checksum": "sha256:d12605b1aaf5d5a9d4d2077fe6e7457f34d946a271c423d87b1ec699d9d01677"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-macos-arm64.zip",
-          "checksum": "sha256:bceb923f196e58cdf6fa9198f2782c26020628d378eeddffbf5d7f08fcfe7dfb"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.2.0/ulog-loader-1.2.0-macos-arm64.zip",
+          "checksum": "sha256:8052293f112fd49a2b0f993c7d0a668a11f9c5f4fc8087334be69fda8490e9b2"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-windows-arm64.zip",
-          "checksum": "sha256:a77f870829d13468a4739e086d616edd418417926fe59ac719aabe82bf821788"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.2.0/ulog-loader-1.2.0-windows-arm64.zip",
+          "checksum": "sha256:4b433eff8a825b6b6eb950a89d2dc55a1db4bfcf50f758ac195ff3c97331028a"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.1.2/ulog-loader-1.1.2-windows-x64.zip",
-          "checksum": "sha256:f2941557cb49f822ecdcf5d4be1c391af8c069f05416e89050200bc28f91203f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_ulog/v1.2.0/ulog-loader-1.2.0-windows-x64.zip",
+          "checksum": "sha256:a081abfcb419552d9357e143293c99bffc907e1b4b3dc3d6409ca6fb4ab48b52"
         }
       }
     },
