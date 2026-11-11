@@ -136,6 +136,20 @@ void OrbitCamera::rotate(float dx_pixels, float dy_pixels) {
 void OrbitCamera::rotateAbout(const glm::vec3& pivot, float dx_pixels, float dy_pixels) {
   const float azimuth_before = state_.azimuth;
   const glm::vec3 dir_before = sphericalDir(state_.azimuth, state_.elevation);
+  // Slide the focal along the view axis to the pivot's depth (eye and angles unchanged, so
+  // nothing moves on screen). Otherwise a focal left far behind the model by earlier zooms
+  // stays the centre of every later rotation and zoom, and the near plane, which follows
+  // the radius, clips the model before the camera gets close. Offsets only: no difference
+  // of large absolute positions.
+  const float depth = glm::dot(state_.focal - pivot, dir_before) + state_.radius;  // pivot depth from the eye
+  float lo = 0.0f;
+  float hi = 0.0f;
+  radiusLimits(scene_bounds_, state_.focal, state_.radius, lo, hi);
+  if (depth > lo) {
+    const float radius = std::min(depth, hi);
+    state_.focal += (state_.radius - radius) * dir_before;
+    state_.radius = radius;
+  }
   rotate(dx_pixels, dy_pixels);
   // The same change of view angles as a rigid rotation of the camera rig: first the
   // elevation step about the camera's horizontal right axis, then the azimuth step
@@ -212,7 +226,15 @@ void OrbitCamera::zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int view
     zoom(scroll_ticks);
     return;
   }
+  zoomAbout(scroll_ticks, target);
+}
 
+void OrbitCamera::zoomToSurface(
+    float scroll_ticks, const glm::vec3& surface, glm::vec2 /*cursor_px*/, int /*viewport_w*/, int /*viewport_h*/) {
+  zoomAbout(scroll_ticks, surface);
+}
+
+void OrbitCamera::zoomAbout(float scroll_ticks, const glm::vec3& target) {
   // Homothety about the cursor point: scaling eye AND focal toward `target` by the
   // same factor is a uniform scaling, so it CANNOT rotate the eye→focal direction —
   // azimuth/elevation are mathematically invariant and the hovered point stays

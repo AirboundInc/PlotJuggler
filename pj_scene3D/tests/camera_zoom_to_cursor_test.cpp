@@ -313,7 +313,8 @@ TEST(CameraRelativeView, FocalStaysPixelLockedZoomingAtLargeCoordinates) {
 }
 
 // Orbiting about a picked point keeps that point fixed on screen (and its distance to the
-// eye), while the view angles change exactly as a plain rotate() would change them.
+// eye), while the view angles change exactly as a plain rotate() would change them and the
+// focal moves to the pivot's depth.
 TEST(RotateAbout, PivotStaysPixelLockedAndAnglesMatchRotate) {
   const glm::vec3 pivot{3.0f, -2.0f, 1.5f};
   for (const glm::vec2 drag : {glm::vec2{40.0f, 0.0f}, glm::vec2{0.0f, -25.0f}, glm::vec2{-30.0f, 18.0f}}) {
@@ -331,7 +332,9 @@ TEST(RotateAbout, PivotStaysPixelLockedAndAnglesMatchRotate) {
     EXPECT_NEAR(glm::length(cam.position() - pivot), dist_before, 1e-4f);
     EXPECT_NEAR(cam.state().azimuth, plain.state().azimuth, 1e-6f);
     EXPECT_NEAR(cam.state().elevation, plain.state().elevation, 1e-6f);
-    EXPECT_NEAR(cam.state().radius, plain.state().radius, 1e-6f);
+    // The focal moved to the pivot's depth: the pivot lies in the focal's view-facing plane.
+    const glm::vec3 view_dir = glm::normalize(cam.position() - cam.state().focal);
+    EXPECT_NEAR(glm::dot(cam.state().focal - pivot, view_dir), 0.0f, 1e-4f);
   }
 }
 
@@ -349,4 +352,58 @@ TEST(RotateAbout, XYOrbitKeepsItsGroundPivot) {
   cam.adoptState(makeOffAxisCamera().state());
   cam.rotateAbout(glm::vec3{3.0f, -2.0f, 1.5f}, 40.0f, 10.0f);
   EXPECT_NEAR(cam.state().focal.z, 0.0f, 1e-6f);
+}
+
+// A model hovering above the ground plane (an aircraft without terrain), seen from 40 m along
+// the view's centre ray with the orbit focal `radius` from the eye on that same ray.
+constexpr glm::vec3 kHoveringModel{0.0f, 0.0f, 30.0f};
+constexpr glm::vec2 kCentrePixel{kW / 2.0f, kH / 2.0f};
+
+OrbitCamera makeHoveringModelCamera(float radius) {
+  OrbitCamera cam;
+  pj::scene3d::AABB scene;
+  scene.min = glm::vec3{-500.0f, -500.0f, 0.0f};
+  scene.max = glm::vec3{500.0f, 500.0f, 30.0f};
+  scene.valid = true;
+  cam.setSceneBounds(scene);
+  CameraState s;
+  s.azimuth = 0.0f;
+  s.elevation = glm::radians(30.0f);
+  const glm::vec3 dir{std::cos(s.elevation), 0.0f, std::sin(s.elevation)};  // focal -> eye
+  const glm::vec3 eye = kHoveringModel + 40.0f * dir;
+  s.focal = eye - radius * dir;
+  s.radius = radius;
+  cam.adoptState(s);
+  return cam;
+}
+
+// The near clipping distance of a perspective projection matrix.
+float nearPlane(const OrbitCamera& cam) {
+  const glm::mat4 proj = cam.projMatrix(kAspect);
+  return proj[3][2] / (proj[2][2] - 1.0f);
+}
+
+// Orbiting about a model point moves the orbit centre onto it, so a far-off focal (left behind
+// the model by earlier zooms) doesn't stay the centre of later rotations and zooms.
+TEST(RotateAbout, RecentresTheOrbitOnThePivot) {
+  OrbitCamera cam = makeHoveringModelCamera(200.0f);  // focal 160 m behind the model
+  const glm::vec2 ndc_before = projectToNdc(kHoveringModel, cam.viewMatrix(), cam.projMatrix(kAspect));
+  cam.rotateAbout(kHoveringModel, 30.0f, 10.0f);
+  EXPECT_LT(glm::length(cam.state().focal - kHoveringModel), 1e-2f);
+  EXPECT_NEAR(cam.state().radius, 40.0f, 1e-2f);
+  const glm::vec2 ndc_after = projectToNdc(kHoveringModel, cam.viewMatrix(), cam.projMatrix(kAspect));
+  EXPECT_NEAR(ndc_after.x, ndc_before.x, 1e-4f);
+  EXPECT_NEAR(ndc_after.y, ndc_before.y, 1e-4f);
+}
+
+// Scrolling with the cursor on a model zooms towards the model, not towards the ground plane
+// behind it, so the camera gets close and the model never falls in front of the near plane.
+TEST(ZoomToCursor, OnAHoveringModelGetsCloseWithoutClippingIt) {
+  OrbitCamera cam = makeHoveringModelCamera(40.0f);  // focal on the model
+  for (int tick = 0; tick < 40; ++tick) {
+    cam.zoomToSurface(1.0f, kHoveringModel, kCentrePixel, kW, kH);  // the depth-picked point
+    const float distance = glm::length(cam.position() - kHoveringModel);
+    ASSERT_GT(distance, nearPlane(cam)) << "model clipped at tick " << tick;
+  }
+  EXPECT_LT(glm::length(cam.position() - kHoveringModel), 1.0f);
 }

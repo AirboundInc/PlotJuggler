@@ -311,6 +311,10 @@ class SceneViewWidget : public QOpenGLWidget {
   [[nodiscard]] unsigned lastShadowMapIdForTest() const {
     return last_shadow_map_id_;
   }
+  // Test seam: the depth pick that drags and the wheel use (pickSurfaceAt).
+  [[nodiscard]] std::optional<glm::vec3> pickSurfaceAtForTest(const QPointF& pos_logical) {
+    return pickSurfaceAt(pos_logical);
+  }
   // CPU wall-time submitting the scene in paintGL (ms), smoothed with the same
   // moving average as the GPU readout. Should stay ~flat across MSAA settings —
   // the AA cost is the GPU's, not the CPU's. Excludes the HUD draw.

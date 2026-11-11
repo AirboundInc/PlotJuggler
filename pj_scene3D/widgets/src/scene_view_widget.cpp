@@ -1021,7 +1021,8 @@ void SceneViewWidget::mousePressEvent(QMouseEvent* event) {
   active_button_ = event->button();
   camera_gesture_changed_ = false;
   orbit_pivot_.reset();
-  if (active_button_ == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) == 0) {
+  // While following a frame the orbit stays on it, so only a free camera orbits the clicked point.
+  if (active_button_ == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) == 0 && follow_frame_.empty()) {
     orbit_pivot_ = pickSurfaceAt(event->position());
   }
   // Hide any hover label for the duration of a camera gesture; it re-appears on
@@ -1197,7 +1198,18 @@ void SceneViewWidget::wheelEvent(QWheelEvent* event) {
   const float ticks = static_cast<float>(event->angleDelta().y()) / 120.0f;
   const QPointF pos = event->position();
   const CameraState before = camera_->state();
-  camera_->zoomToCursor(ticks, glm::vec2{static_cast<float>(pos.x()), static_cast<float>(pos.y())}, width(), height());
+  const glm::vec2 cursor{static_cast<float>(pos.x()), static_cast<float>(pos.y())};
+  // While following a frame, zoom towards it (the look-at point) wherever the cursor is.
+  // Otherwise, over geometry, zoom towards the surface under the cursor rather than the ground
+  // or focal plane behind it, so the camera closes in on (and never flies past) a model above
+  // the ground.
+  if (!follow_frame_.empty()) {
+    camera_->zoom(ticks);
+  } else if (const std::optional<glm::vec3> surface = pickSurfaceAt(pos)) {
+    camera_->zoomToSurface(ticks, *surface, cursor, width(), height());
+  } else {
+    camera_->zoomToCursor(ticks, cursor, width(), height());
+  }
   update();
   if (!cameraStatesEqual(before, camera_->state())) {
     emit presentationChanged();

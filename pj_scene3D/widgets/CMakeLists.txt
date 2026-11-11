@@ -643,6 +643,19 @@ if(PJ_BUILD_TESTS)
   target_compile_options(shadow_persistence_gl_test PRIVATE ${PJ_WARNING_FLAGS})
   add_test(NAME shadow_persistence_gl_test COMMAND shadow_persistence_gl_test)
 
+  # Depth pick behind orbit-about-surface and wheel zoom towards it, on a real
+  # SceneViewWidget. Same custom main and skip rules as shadow_persistence_gl_test.
+  add_executable(scene_view_pick_gl_test
+    tests/scene_view_pick_gl_test.cpp
+  )
+  target_link_libraries(scene_view_pick_gl_test PRIVATE
+    pj_scene3d_widgets
+    GTest::gtest
+    pj_gpu_test_gate
+  )
+  target_compile_options(scene_view_pick_gl_test PRIVATE ${PJ_WARNING_FLAGS})
+  add_test(NAME scene_view_pick_gl_test COMMAND scene_view_pick_gl_test)
+
   # Keep the robot-model executable separate: it needs both the fixture-path
   # definition and test hooks, unlike the other fixture sources.
   set(PJ_SCENE3D_WIDGETS_TESTS

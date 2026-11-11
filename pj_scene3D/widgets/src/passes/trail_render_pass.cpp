@@ -41,11 +41,13 @@ void main() {
 }
 )";
 
+// u_color is a display (sRGB) colour; the scene buffer is linear light and the present
+// re-encodes it, so linearise here like the other passes (else trails show much lighter).
 constexpr std::string_view kFragSrc = R"(#version 450 core
 uniform vec3 u_color;
 out vec4 frag_color;
 void main() {
-  frag_color = vec4(u_color, 1.0);
+  frag_color = vec4(pow(max(u_color, vec3(0.0)), vec3(2.2)), 1.0);
 }
 )";
 

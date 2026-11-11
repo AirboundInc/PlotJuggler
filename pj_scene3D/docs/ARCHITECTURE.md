@@ -398,9 +398,26 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   `ICamera::rotateAbout(pivot, dx, dy)`: `OrbitCamera` changes the angles exactly as
   `rotate()` does and moves the focal by the equivalent rigid rotation of the rig about
   the pivot (elevation step about the horizontal right axis, then azimuth about +Z), so
-  the pivot stays pixel-locked. Background (cleared depth) keeps plain `rotate()`.
+  the pivot stays pixel-locked. Before turning it slides the focal along the view axis
+  to the pivot's depth (eye and angles unchanged): a focal left far behind the model by
+  earlier zooms would otherwise stay the centre of later rotations and zooms, and the
+  near plane (which follows the radius) clipped the model before the camera got close.
+  Background (cleared depth) keeps plain `rotate()`.
   `XYOrbitCamera` ignores the pivot to keep its ground lock; Fly and TopDown use the
   default (plain rotate).
+- **Zoom towards the surface under the cursor.** The wheel uses the same depth pick:
+  over geometry it calls `ICamera::zoomToSurface(ticks, surface, ...)`, a homothety about
+  the picked point (`OrbitCamera::zoomAbout`, shared with `zoomToCursor`), so a model
+  above the ground is closed in on instead of flown past towards the z=0 / focal-plane
+  anchor `zoomToCursor` uses. Over background it keeps `zoomToCursor`. `XYOrbitCamera`
+  (ground lock), Fly and TopDown ignore the surface.
+- **A followed frame stays the orbit and zoom centre.** While `follow_frame_` is set,
+  neither the press nor the wheel picks: drags call plain `rotate()` and the wheel calls
+  `zoom()`, both about the focal that `applyFollow` keeps on the frame. A pan offset
+  survives (it moves the focal), and `recenterOnFollowFrame` removes it. Without this,
+  a grazing view of a vehicle near the ground sent cursor zooms to a ground point far
+  beside it, the follow then carried that offset along, and the vehicle drifted out of
+  the orbit centre.
 - **Large-coordinate precision (camera-relative rendering).** Following a frame in a
   UTM/GPS-scale map parks the camera at ~1e5–1e7 m, where float32 keeps only ~0.1–0.6 m
   of resolution and `view × world-geometry` (subtracting the ~1e6 eye from a ~1e6
@@ -528,6 +545,10 @@ the behavioral contract; the as-built mechanics:
   L 0.65 / C 0.11 (the largest chroma all hues reach inside sRGB, so neighbours are equally far
   apart perceptually; starting at OKLCH red, 29 deg), moved
   to the next slot not among the other trails' past colours; future = 55 % white tint.
+- **Colours are sRGB, the buffer is linear.** `TrailRenderPass`'s fragment shader
+  linearises `u_color` (`pow(c, 2.2)`) like the other passes, because the HDR scene
+  buffer is linear light and the present re-encodes to sRGB; writing the colour as-is
+  showed every trail much lighter than picked (`ColorIsLinearizedIntoTheLinearSceneBuffer`).
 - **Sampling grid = the chain's own stamps.** `TransformBuffer::chainSampleTimes`
   unions every edge's sample stamps along the connecting path (both chains to
   the common ancestor), so a statically-mounted child (lidar on base_link)
