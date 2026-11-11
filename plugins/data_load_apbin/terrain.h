@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -38,6 +39,17 @@ struct Options
 {
   std::filesystem::path cache_dir;  // tiles are read from and written to here
   bool allow_download = true;       // false: cached tiles only
+  // Called on build_terrain's thread every few tens of milliseconds while tiles are fetched, with
+  // the tiles fetched so far and the total. Returning false stops the remaining fetches, and
+  // build_terrain then fails with "cancelled".
+  std::function<bool(int done, int total)> on_tiles;
+};
+
+// The tiles build_terrain would fetch for an area, and how many of them are not cached yet.
+struct TileCount
+{
+  int total = 0;
+  int uncached = 0;
 };
 
 struct Terrain
@@ -60,6 +72,10 @@ struct Terrain
 // or the area is unusable); missing imagery alone only leaves those patches untextured.
 std::optional<Terrain> build_terrain(const GeoOrigin& origin, const LocalBounds& area, const Options& options,
                                      std::string& error);
+
+// The tiles build_terrain(origin, area, options) would fetch, without fetching them, so the
+// caller can estimate how long the build takes. nullopt when build_terrain would reject the area.
+std::optional<TileCount> count_tiles(const GeoOrigin& origin, const LocalBounds& area, const Options& options);
 
 // The default tile cache: AIRBOUND_TILE_CACHE_DIR, else %LOCALAPPDATA%\Airbound\PlotJuggler\tiles on
 // Windows, $XDG_CACHE_HOME (or ~/.cache)/airbound/plotjuggler/tiles elsewhere.

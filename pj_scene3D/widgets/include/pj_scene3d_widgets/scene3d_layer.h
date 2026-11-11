@@ -124,6 +124,19 @@ class Scene3DLayer : public PJ::ISceneLayer {
     return std::nullopt;
   }
 
+  // Where the camera should look to show this layer's model, for the dock's focus on a
+  // dropped topic: the frame the model rides on and the model's extent in that frame.
+  struct ModelFocus {
+    std::string frame;
+    AABB bounds;  // in `frame`, not the fixed frame
+  };
+  // nullopt when the layer has no model, or while its geometry is still loading (the
+  // layer emits repaintRequested when a load lands, so callers retry then). May start
+  // that load. Valid regardless of the playhead: it reads the topic's first model.
+  [[nodiscard]] virtual std::optional<ModelFocus> modelFocus() {
+    return std::nullopt;
+  }
+
   // Depth-only render of this layer's shadow casters from the light's point of view,
   // into the shadow map currently bound by the SceneViewWidget pre-pass.
   // `light_view_proj` is the world->light-clip matrix from fitDirectionalShadowCamera.

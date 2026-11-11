@@ -198,3 +198,17 @@ constant (472 335.072 s, ±256 ns double rounding).
     terrain: GPS altitude, the elevation data (surface model, ~10 m pixels) and the EKF's height
     drift disagree by a few metres.
   - `apbin_dump` with `APBIN_DUMP_MODELS_DIR=<dir>` writes every inline model to `<dir>/<id>.glb`.
+- **Progress over the whole load (2026-11-05).** PJ3's bar tracked parsing only (row 4), so in PJ4
+  it sat at 100% while the rows, transforms, models and terrain were written. `load_progress.h`
+  now gives each stage a share of one bar (total 1000) by its estimated seconds: parsing and
+  processing by file size, the rows by count, the transforms by count, the models a fixed 0.3 s,
+  and the terrain 0.07 s per tile still to download plus 1 ms per cached one
+  (`terrain::count_tiles`). The estimates that depend on the parsed data are set after parsing,
+  and the bar left over is split again at each stage start, so it never moves backwards. While
+  tiles are fetched (`Options::on_tiles`) the bar follows the fetched tiles or the elapsed time
+  against the estimate, whichever is further, because single tiles can take seconds. Rows are
+  written with progress ticks, so the host also flushes them during the load. On AA-TRT-0051 the
+  bar moves steadily: about 3 s with the tile cache, about 10 s when downloading. The file is now
+  read with one sized read: `istreambuf_iterator` took 1.3 s for 53 MB.
+  - `apbin_dump` with `APBIN_DUMP_TIMINGS=1` prints every progress tick, host message and first
+    object push to stderr with the seconds since the start.

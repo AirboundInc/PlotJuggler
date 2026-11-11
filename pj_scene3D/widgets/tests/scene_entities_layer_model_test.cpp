@@ -929,6 +929,58 @@ TEST(SceneEntitiesLayerModelTest, LocalFileModelUrlLoadsWithoutOptIn) {
       << "local file URL tripped the remote gate: " << layer.remoteFetchNotice().toStdString();
 }
 
+// modelFocus() measures the topic's first model in its own frame, whatever the playhead,
+// once the mesh has loaded; until then (and for a stub that fails to import) it has no answer.
+TEST(SceneEntitiesLayerModelTest, ModelFocusMeasuresFirstModelInItsFrame) {
+  isolateSettings();
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  const QString fixture = QString(PJ_SCENE3D_FIXTURES_DIR) + u"/meshes/cube.stl"_s;
+  PJ::sdk::SceneEntity entity =
+      makeUrlEntity("vehicle", 10, QUrl::fromLocalFile(fixture).toString().toStdString(), "model/stl");
+  entity.models.front().scale = {.x = 2.0, .y = 3.0, .z = 4.0};
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({entity}));
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  layer.setTrackerTime(PJ::fromRaw(0));  // before the model's message: no entity is live
+
+  std::optional<pj::scene3d::Scene3DLayer::ModelFocus> focus = layer.modelFocus();
+  QElapsedTimer timer;
+  timer.start();
+  while (!focus.has_value() && timer.elapsed() < 5000) {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    focus = layer.modelFocus();
+  }
+  ASSERT_TRUE(focus.has_value()) << "model focus never became available";
+  EXPECT_EQ(focus->frame, "base_link");
+  const glm::vec3 extent = focus->bounds.max - focus->bounds.min;
+  ASSERT_GT(extent.x, 0.0f);
+  // The cube fixture is a cube, so the primitive's scale shows up as the extent ratio.
+  EXPECT_NEAR(extent.y / extent.x, 1.5f, 1e-4f);
+  EXPECT_NEAR(extent.z / extent.x, 2.0f, 1e-4f);
+  EXPECT_TRUE(layer.currentEntities().empty()) << "measuring must not fold the model state";
+}
+
+TEST(SceneEntitiesLayerModelTest, ModelFocusIsEmptyWhenTheModelFailsToLoad) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({makeEntity("car", 10)}));  // stub GLB bytes
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  QElapsedTimer timer;
+  timer.start();
+  while (timer.elapsed() < 500) {
+    EXPECT_FALSE(layer.modelFocus().has_value()) << "a failed import must not report the placeholder's bounds";
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+  }
+}
+
 // A URL record exists BEFORE its bytes do (pending fetch, future default-
 // invalid). pollMeshLoads — driven here by a sibling embedded-data record's
 // completion watcher — must skip the pending record instead of calling

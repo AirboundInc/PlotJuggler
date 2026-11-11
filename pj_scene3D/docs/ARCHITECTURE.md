@@ -376,6 +376,31 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   `followShift(target − current focal)`) that snaps the camera onto the target on
   demand. Heading / Pose (rotation-following) modes are future work; the
   `FollowMode` enum already reserves the slot.
+- **Focus on a dropped model.** An interactive `Scene3DDockWidget::addTopic` of a
+  `kSceneEntities` topic, while the dock follows nothing, arms `pending_focus_topic_`.
+  `tryModelFocus` asks the layer for `Scene3DLayer::modelFocus()` — for
+  `SceneEntitiesLayer`, the first entity with a model among the topic's first 16
+  messages, measured in its own frame once its meshes have loaded (an unloaded mesh
+  would measure as the placeholder cube). The loads use the replay's mesh keys, so the
+  real entity reuses them; nothing is folded, so the playhead can be anywhere.
+  `SceneViewWidget::focusOnFrameBounds` then centres the orbit on the box, placing the
+  frame at the playhead or, before its first pose, at `TransformBuffer::getEarliestSample`,
+  with radius 2.5x the box diagonal; the dock then follows that frame (seeding at
+  first appearance keeps the camera on it). Retried on the layer's (queued)
+  `repaintRequested` and on TF readiness; dropped when the user picks a follow frame
+  first, the layer goes away, or the model's frame is the fixed frame (a static model:
+  terrain, a map). Layout restore never arms it. Desktop only.
+- **Orbit about the clicked surface.** A left press (no Shift) reads one pixel of the
+  resolved scene depth (`pickSurfaceAt`, `glGetTextureSubImage` on
+  `SceneHdrFbo::resolvedDepthTextureId`, mapped through the chain's own size so
+  supersampling holds) and unprojects it through the camera-relative
+  `last_view_proj_` plus `render_origin_`. A hit makes the drag call
+  `ICamera::rotateAbout(pivot, dx, dy)`: `OrbitCamera` changes the angles exactly as
+  `rotate()` does and moves the focal by the equivalent rigid rotation of the rig about
+  the pivot (elevation step about the horizontal right axis, then azimuth about +Z), so
+  the pivot stays pixel-locked. Background (cleared depth) keeps plain `rotate()`.
+  `XYOrbitCamera` ignores the pivot to keep its ground lock; Fly and TopDown use the
+  default (plain rotate).
 - **Large-coordinate precision (camera-relative rendering).** Following a frame in a
   UTM/GPS-scale map parks the camera at ~1e5–1e7 m, where float32 keeps only ~0.1–0.6 m
   of resolution and `view × world-geometry` (subtracting the ~1e6 eye from a ~1e6
@@ -497,6 +522,12 @@ topic's first pose) across the whole loaded time range as a
 screen-space ribbon (triangle strip) in the fixed frame, split-colored at the tracker time. See REQUIREMENTS §3b for
 the behavioral contract; the as-built mechanics:
 
+- **Default colours.** `Scene3DDockWidget::addTrailLayer` (interactive only) picks
+  them with `defaultTrailColors(name, taken)`: an FNV-1a hash of the frame name (stable
+  across processes and Qt versions, unlike `qHash`) into 8 hues 45 deg apart in OKLCH at
+  L 0.65 / C 0.11 (the largest chroma all hues reach inside sRGB, so neighbours are equally far
+  apart perceptually; starting at OKLCH red, 29 deg), moved
+  to the next slot not among the other trails' past colours; future = 55 % white tint.
 - **Sampling grid = the chain's own stamps.** `TransformBuffer::chainSampleTimes`
   unions every edge's sample stamps along the connecting path (both chains to
   the common ancestor), so a statically-mounted child (lidar on base_link)

@@ -249,6 +249,12 @@ class ICamera {
   virtual void followShift(const glm::vec3& world_delta) = 0;
 
   virtual void rotate(float dx_pixels, float dy_pixels) = 0;
+  // rotate(), but turning the whole camera about `pivot` (a world point, e.g. the
+  // surface under the cursor) instead of about the camera's own anchor, so the pivot
+  // stays put on screen. Models without a free orbit pivot ignore `pivot`.
+  virtual void rotateAbout(const glm::vec3& /*pivot*/, float dx_pixels, float dy_pixels) {
+    rotate(dx_pixels, dy_pixels);
+  }
   virtual void pan(float dx_pixels, float dy_pixels) = 0;
   virtual void zoom(float scroll_ticks) = 0;
   // Zoom keeping the world point under the cursor fixed. cursor_px is in Qt
@@ -279,6 +285,7 @@ class OrbitCamera : public ICamera {
 
   void followShift(const glm::vec3& world_delta) override;  // focal += delta
   void rotate(float dx_pixels, float dy_pixels) override;
+  void rotateAbout(const glm::vec3& pivot, float dx_pixels, float dy_pixels) override;
   void pan(float dx_pixels, float dy_pixels) override;
   void zoom(float scroll_ticks) override;
   void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) override;
@@ -309,6 +316,11 @@ class XYOrbitCamera final : public OrbitCamera {
   // Ground-locked override: shift focal in XY only (drop world_delta.z) so the
   // pivot never floats off the floor while following a frame with vertical motion.
   void followShift(const glm::vec3& world_delta) override;
+  // Orbits its ground pivot as rotate() does: turning about an off-floor point would
+  // lift the pivot off z=0.
+  void rotateAbout(const glm::vec3& /*pivot*/, float dx_pixels, float dy_pixels) override {
+    rotate(dx_pixels, dy_pixels);
+  }
   void pan(float dx_pixels, float dy_pixels) override;
   void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) override;
   // Re-lock the pivot to the floor (z=0) after adopting an arbitrary pose, keeping

@@ -326,6 +326,37 @@ void SceneViewWidget::recenterOnFollowFrame() {
   }
 }
 
+bool SceneViewWidget::focusOnFrameBounds(const std::string& frame, const AABB& frame_bounds) {
+  if (tf_ == nullptr || fixed_frame_.empty() || !frame_bounds.valid) {
+    return false;
+  }
+  auto x = tf_->tryLookupTransform(fixed_frame_, frame, render_time_);
+  if (!x) {
+    if (const auto first = tf_->getEarliestSample(frame); first.has_value()) {
+      x = tf_->tryLookupTransform(fixed_frame_, frame, *first);
+    }
+  }
+  if (!x) {
+    return false;
+  }
+  const glm::dvec3 center = *x * ((glm::dvec3(frame_bounds.min) + glm::dvec3(frame_bounds.max)) * 0.5);
+  const float size = glm::length(frame_bounds.max - frame_bounds.min);
+  // A few model sizes away shows the whole model with some context; the floor keeps a
+  // tiny or flat model from putting the eye inside it.
+  constexpr float kRadiusPerSize = 2.5F;
+  constexpr float kMinRadius = 1.0F;
+  const CameraState before = camera_->state();
+  CameraState focused = before;
+  focused.focal = glm::vec3(center);
+  focused.radius = std::max(size * kRadiusPerSize, kMinRadius);
+  camera_->adoptState(focused);
+  update();
+  if (!cameraStatesEqual(before, camera_->state())) {
+    emit presentationChanged();
+  }
+  return true;
+}
+
 uint64_t SceneViewWidget::followRenderKey(PJ::Timepoint time) const {
   if (follow_frame_.empty() || tf_ == nullptr || fixed_frame_.empty()) {
     return 0;
@@ -989,6 +1020,10 @@ void SceneViewWidget::mousePressEvent(QMouseEvent* event) {
   last_mouse_pos_ = event->position().toPoint();
   active_button_ = event->button();
   camera_gesture_changed_ = false;
+  orbit_pivot_.reset();
+  if (active_button_ == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) == 0) {
+    orbit_pivot_ = pickSurfaceAt(event->position());
+  }
   // Hide any hover label for the duration of a camera gesture; it re-appears on
   // the next button-free move (the hit-test below only runs with no button).
   if (hovered_frame_.has_value()) {
@@ -1038,7 +1073,11 @@ void SceneViewWidget::mouseMoveEvent(QMouseEvent* event) {
   bool handled = true;
 
   if (active_button_ == Qt::LeftButton && !shift) {
-    camera_->rotate(dx, dy);
+    if (orbit_pivot_.has_value()) {
+      camera_->rotateAbout(*orbit_pivot_, dx, dy);
+    } else {
+      camera_->rotate(dx, dy);
+    }
   } else if (active_button_ == Qt::MiddleButton || (active_button_ == Qt::LeftButton && shift)) {
     camera_->pan(dx, dy);
   } else if (active_button_ == Qt::RightButton) {
@@ -1061,6 +1100,42 @@ void SceneViewWidget::leaveEvent(QEvent* event) {
     update();
   }
   QOpenGLWidget::leaveEvent(event);
+}
+
+std::optional<glm::vec3> SceneViewWidget::pickSurfaceAt(const QPointF& pos_logical) {
+  const QSize fbo = scene_fbo_.size();
+  if (!scene_fbo_.ready() || fbo.isEmpty() || width() <= 0 || height() <= 0) {
+    return std::nullopt;
+  }
+  // The scene chain may be supersampled, so map through its own size, not the DPR.
+  const int px = std::clamp(
+      static_cast<int>(pos_logical.x() * fbo.width() / width()), 0, fbo.width() - 1);
+  const int py = std::clamp(
+      static_cast<int>((height() - pos_logical.y()) * fbo.height() / height()), 0, fbo.height() - 1);
+  makeCurrent();
+  float depth = 1.0f;
+  if (auto* funcs = QOpenGLVersionFunctionsFactory::get<QOpenGLFunctions_4_5_Core>(context()); funcs != nullptr) {
+    funcs->glGetTextureSubImage(
+        scene_fbo_.resolvedDepthTextureId(), 0, px, py, 0, 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(depth),
+        &depth);
+  }
+  doneCurrent();
+  if (!(depth < 1.0f)) {
+    return std::nullopt;  // cleared depth: nothing drawn here
+  }
+  const glm::vec4 ndc{
+      (static_cast<float>(px) + 0.5f) / static_cast<float>(fbo.width()) * 2.0f - 1.0f,
+      (static_cast<float>(py) + 0.5f) / static_cast<float>(fbo.height()) * 2.0f - 1.0f, depth * 2.0f - 1.0f, 1.0f};
+  const glm::vec4 rel = glm::inverse(last_view_proj_) * ndc;
+  if (std::abs(rel.w) < 1e-12f) {
+    return std::nullopt;
+  }
+  // last_view_proj_ is camera-relative: add the render origin back in double.
+  const glm::dvec3 world = glm::dvec3(glm::vec3(rel) / rel.w) + render_origin_;
+  if (!std::isfinite(world.x) || !std::isfinite(world.y) || !std::isfinite(world.z)) {
+    return std::nullopt;
+  }
+  return glm::vec3(world);
 }
 
 std::optional<std::string> SceneViewWidget::pickFrameAt(const QPointF& pos_logical) const {

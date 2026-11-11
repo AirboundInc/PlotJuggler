@@ -372,6 +372,15 @@ std::optional<TimePoint> TransformBuffer::getLatestSample(const std::string& chi
   return history.samples.back().first;
 }
 
+std::optional<TimePoint> TransformBuffer::getEarliestSample(const std::string& child) const {
+  std::shared_lock lock(parents_mutex_);
+  auto it = parents_.find(child);
+  if (it == parents_.end() || it->second.history.samples.empty()) {
+    return std::nullopt;
+  }
+  return it->second.history.samples.front().first;
+}
+
 void TransformBuffer::clear() {
   std::unique_lock lock(parents_mutex_);
   parents_.clear();

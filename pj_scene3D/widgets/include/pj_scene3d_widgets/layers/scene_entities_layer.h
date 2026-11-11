@@ -150,6 +150,9 @@ class SceneEntitiesLayer : public Scene3DLayer {
   [[nodiscard]] QString statusWarning() const override {
     return remote_fetch_notice_;
   }
+  // The first entity with a model among the topic's first messages; starts its mesh
+  // loads under the same keys the replay uses, so the real entity reuses them.
+  [[nodiscard]] std::optional<ModelFocus> modelFocus() override;
 
  signals:
   // remoteFetchNotice() changed (possibly back to empty).
@@ -159,6 +162,11 @@ class SceneEntitiesLayer : public Scene3DLayer {
   // Decode the first sample once at attach so we know the source frame and time
   // range before render is called.
   bool bootstrap();
+  // modelFocus() source: the entity, once found, and how many entries were scanned
+  // without finding one (rescanned only when the topic grows, up to a small cap).
+  std::optional<PJ::sdk::SceneEntity> focus_entity_;
+  std::size_t focus_scanned_entries_ = 0;
+
   // Reset every replay/bootstrap artifact — decoded entities, the active marker
   // batch in pass_, replay cursors (last_marker_uid_ / last_applied_uid_ /
   // state_built_at_), snapshot cache, source-frame/time-range bookkeeping, mesh

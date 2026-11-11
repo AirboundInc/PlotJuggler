@@ -13,6 +13,9 @@
 // Object topics (pj.source_object_write.v1) print one OBJECT summary line each; FrameTransforms
 // topics also print a TFEDGES line (transforms per frame edge, entry order) and TF lines for a
 // few decoded samples.
+//
+// APBIN_DUMP_TIMINGS=1 also prints to stderr, with the seconds since the load started, every
+// progress start/update, host message and object push, to see where a load spends its time.
 
 #include <pj_base/builtin/frame_transforms_codec.hpp>
 #include <pj_base/builtin/scene_entities_codec.hpp>
@@ -26,6 +29,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -69,6 +73,16 @@ struct ObjectTopic {
   std::string metadata;
   std::vector<std::pair<int64_t, std::vector<uint8_t>>> entries;
 };
+
+// Prints `what` to stderr with the seconds since the first call, when APBIN_DUMP_TIMINGS is set.
+void traceTiming(const std::string& what) {
+  static const bool enabled = std::getenv("APBIN_DUMP_TIMINGS") != nullptr;
+  static const auto start = std::chrono::steady_clock::now();
+  if (enabled) {
+    const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::fprintf(stderr, "[%8.3f s] %s\n", s, what.c_str());
+  }
+}
 
 double toDouble(const PJ_scalar_value_t& v) {
   switch (v.type) {
@@ -124,7 +138,9 @@ class FakeHost {
     return {this, &registry_vt_};
   }
 
-  std::vector<Topic> topics;
+  // A deque: Topic holds std::maps, which MSVC copies instead of moving when a vector grows, so a
+  // vector re-copied every stored point each time it grew and skewed the timings.
+  std::deque<Topic> topics;
   std::map<std::string, uint32_t, std::less<>> topic_ids;
   std::vector<std::string> messages;
   std::string metadata;
@@ -233,14 +249,19 @@ class FakeHost {
 
   static void reportMessage(void* ctx, PJ_data_source_message_level_t level, PJ_string_view_t message) noexcept {
     self(ctx)->messages.push_back("[" + std::to_string(static_cast<int>(level)) + "] " + std::string(sv(message)));
+    traceTiming("message " + std::string(sv(message)));
   }
-  static bool progressStart(void*, PJ_string_view_t, uint64_t, bool, PJ_error_t*) noexcept {
+  static bool progressStart(void*, PJ_string_view_t label, uint64_t total, bool, PJ_error_t*) noexcept {
+    traceTiming("progress start '" + std::string(sv(label)) + "' total=" + std::to_string(total));
     return true;
   }
-  static bool progressUpdate(void*, uint64_t) noexcept {
+  static bool progressUpdate(void*, uint64_t current) noexcept {
+    traceTiming("progress " + std::to_string(current));
     return true;
   }
-  static void progressFinish(void*) noexcept {}
+  static void progressFinish(void*) noexcept {
+    traceTiming("progress finish");
+  }
   static bool isStopRequested(void*) noexcept {
     return false;
   }
@@ -274,6 +295,9 @@ class FakeHost {
       return false;
     }
     h->object_topics[topic.id - 1].entries.emplace_back(ts, std::vector<uint8_t>(data, data + size));
+    if (h->object_topics[topic.id - 1].entries.size() == 1) {
+      traceTiming("first object on " + h->object_topics[topic.id - 1].name + " (" + std::to_string(size) + " bytes)");
+    }
     return true;
   }
   static bool pushLazy(
@@ -367,8 +391,10 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  traceTiming("start");
   const auto start = std::chrono::steady_clock::now();
   const bool ok = vt->start(ctx, &err);
+  traceTiming("start returned");
   const auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   vt->destroy(ctx);

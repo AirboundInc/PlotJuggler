@@ -133,6 +133,28 @@ void OrbitCamera::rotate(float dx_pixels, float dy_pixels) {
   state_.elevation = std::clamp(state_.elevation + dy_pixels / kPixelsPerRadian, -kPolarLimit, kPolarLimit);
 }
 
+void OrbitCamera::rotateAbout(const glm::vec3& pivot, float dx_pixels, float dy_pixels) {
+  const float azimuth_before = state_.azimuth;
+  const glm::vec3 dir_before = sphericalDir(state_.azimuth, state_.elevation);
+  rotate(dx_pixels, dy_pixels);
+  // The same change of view angles as a rigid rotation of the camera rig: first the
+  // elevation step about the camera's horizontal right axis, then the azimuth step
+  // about world +Z. Applied to the focal relative to the pivot (both small local
+  // vectors, so no large-coordinate cancellation); the eye follows from the angles.
+  const glm::vec3 dir_pitched = sphericalDir(azimuth_before, state_.elevation);
+  const glm::vec3 dir_after = sphericalDir(state_.azimuth, state_.elevation);
+  glm::mat4 rig{1.0f};
+  const float yaw = std::atan2(dir_after.y, dir_after.x) - std::atan2(dir_pitched.y, dir_pitched.x);
+  rig = glm::rotate(rig, yaw, glm::vec3{0.0f, 0.0f, 1.0f});
+  const glm::vec3 pitch_axis = glm::cross(dir_before, dir_pitched);
+  const float pitch_sin = glm::length(pitch_axis);
+  if (pitch_sin > 1e-7f) {
+    const float pitch = std::atan2(pitch_sin, glm::dot(dir_before, dir_pitched));
+    rig = glm::rotate(rig, pitch, pitch_axis / pitch_sin);
+  }
+  state_.focal = pivot + glm::vec3(rig * glm::vec4(state_.focal - pivot, 0.0f));
+}
+
 void OrbitCamera::pan(float dx_pixels, float dy_pixels) {
   const glm::mat4 view = viewMatrix();
   const glm::vec3 right{view[0][0], view[1][0], view[2][0]};

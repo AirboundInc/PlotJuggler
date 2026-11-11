@@ -16,7 +16,9 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -270,19 +272,27 @@ HttpResult http_get(const std::string& url)
   return {.body = std::move(body)};
 }
 
+// Where `tile` of `source` is cached under `cache_dir`.
+std::filesystem::path cache_path(const std::filesystem::path& cache_dir, const TileSource& source, const TileId& tile)
+{
+  return cache_dir / source.cache_subdir / std::to_string(tile.z) / std::to_string(tile.x) /
+         (std::to_string(tile.y) + source.extension);
+}
+
 // Cache-first tile access. After a network error (or when downloads are off) only the cache is
-// used, so an offline load costs one connect timeout, not one per tile.
+// used, so an offline load costs one connect timeout, not one per tile. Reports progress through
+// Options::on_tiles, counting `total_tiles` over all get_all calls.
 class Fetcher
 {
 public:
-  explicit Fetcher(const Options& options) : options_(options), offline_(!options.allow_download)
+  Fetcher(const Options& options, int total_tiles)
+    : options_(options), offline_(!options.allow_download), total_tiles_(total_tiles)
   {
   }
 
   std::optional<std::vector<uint8_t>> get(const TileSource& source, const TileId& tile)
   {
-    const std::filesystem::path path = options_.cache_dir / source.cache_subdir / std::to_string(tile.z) /
-                                       std::to_string(tile.x) / (std::to_string(tile.y) + source.extension);
+    const std::filesystem::path path = cache_path(options_.cache_dir, source, tile);
     if (auto cached = read_file(path))
     {
       return cached;
@@ -306,32 +316,28 @@ public:
     return std::move(result.body);
   }
 
-  // All of `tiles`, in order (nullopt where unavailable). The first is fetched alone so an
-  // offline machine is detected before the parallel fetch starts.
+  // All of `tiles`, in order (nullopt where unavailable or after a stop). The first is fetched
+  // alone so an offline machine is detected before the parallel fetch starts. Workers do all the
+  // fetching while the calling thread reports progress, so on_tiles always runs on it.
   std::vector<std::optional<std::vector<uint8_t>>> get_all(const TileSource& source, const std::vector<TileId>& tiles)
   {
     std::vector<std::optional<std::vector<uint8_t>>> results(tiles.size());
-    if (tiles.empty())
+    if (tiles.empty() || stopped_)
     {
       return results;
     }
-    results[0] = get(source, tiles[0]);
-    std::atomic<size_t> next{1};
-    const auto worker = [&] {
-      for (size_t k = next++; k < tiles.size(); k = next++)
-      {
-        results[k] = get(source, tiles[k]);
-      }
+    const auto fetch = [&](size_t k) {
+      results[k] = get(source, tiles[k]);
+      ++fetched_;
     };
-    std::vector<std::thread> threads;
-    for (size_t t = 0; t < std::min(kDownloadThreads, tiles.size() - 1); ++t)
-    {
-      threads.emplace_back(worker);
-    }
-    for (std::thread& thread : threads)
-    {
-      thread.join();
-    }
+    run_reporting(1, [&] { fetch(0); });
+    std::atomic<size_t> next{1};
+    run_reporting(std::min(kDownloadThreads, tiles.size() - 1), [&] {
+      for (size_t k = next++; k < tiles.size() && !stopped_; k = next++)
+      {
+        fetch(k);
+      }
+    });
     return results;
   }
 
@@ -343,12 +349,58 @@ public:
   {
     return network_failed_;
   }
+  // on_tiles asked to stop: the results are incomplete.
+  bool stopped() const
+  {
+    return stopped_;
+  }
 
 private:
+  // Runs `work` on `threads` threads and reports progress until they all finish.
+  void run_reporting(size_t threads, const std::function<void()>& work)
+  {
+    std::mutex mutex;
+    std::condition_variable finished;
+    size_t running = threads;
+    std::vector<std::thread> pool;
+    for (size_t t = 0; t < threads; ++t)
+    {
+      pool.emplace_back([&] {
+        work();
+        const std::lock_guard<std::mutex> lock(mutex);
+        --running;
+        finished.notify_one();
+      });
+    }
+    for (std::unique_lock<std::mutex> lock(mutex);
+         !finished.wait_for(lock, std::chrono::milliseconds(30), [&] { return running == 0; });)
+    {
+      lock.unlock();
+      report();
+      lock.lock();
+    }
+    for (std::thread& thread : pool)
+    {
+      thread.join();
+    }
+    report();
+  }
+
+  void report()
+  {
+    if (options_.on_tiles && !stopped_ && !options_.on_tiles(fetched_, total_tiles_))
+    {
+      stopped_ = true;
+    }
+  }
+
   Options options_;
   std::atomic<bool> offline_;
   std::atomic<bool> network_failed_{false};
   std::atomic<int> downloaded_{0};
+  std::atomic<int> fetched_{0};
+  std::atomic<bool> stopped_{false};
+  int total_tiles_ = 0;
 };
 
 // Terrarium: height = R * 256 + G + B / 256 - 32768 metres above sea level.
@@ -550,8 +602,17 @@ std::filesystem::path default_cache_dir()
   return std::filesystem::temp_directory_path(ec) / "airbound_plotjuggler_tiles";
 }
 
-std::optional<Terrain> build_terrain(const GeoOrigin& origin, const LocalBounds& area, const Options& options,
-                                     std::string& error)
+namespace
+{
+
+// The imagery and elevation tiles covering an area.
+struct TilePlan
+{
+  TileRange imagery;
+  TileRange elevation;
+};
+
+std::optional<TilePlan> plan_tiles(const GeoOrigin& origin, const LocalBounds& area, std::string& error)
 {
   const double cos_lat0 = std::cos(origin.lat_deg * kDegToRad);
   if (!(area.max_east > area.min_east) || !(area.max_north > area.min_north) || !(cos_lat0 > 1e-3))
@@ -580,11 +641,56 @@ std::optional<Terrain> build_terrain(const GeoOrigin& origin, const LocalBounds&
     return std::nullopt;
   }
   const int elevation_zoom = std::min(imagery_zoom, kMaxElevationZoom);
-  const TileRange elevation_range = range_for(lat_min, lat_max, lon_min, lon_max, elevation_zoom);
+  return TilePlan{.imagery = imagery_range,
+                  .elevation = range_for(lat_min, lat_max, lon_min, lon_max, elevation_zoom)};
+}
 
-  Fetcher fetcher(options);
-  const std::vector<TileId> elevation_tiles = tiles_of(elevation_range);
+}  // namespace
+
+std::optional<TileCount> count_tiles(const GeoOrigin& origin, const LocalBounds& area, const Options& options)
+{
+  std::string error;
+  const std::optional<TilePlan> plan = plan_tiles(origin, area, error);
+  if (!plan)
+  {
+    return std::nullopt;
+  }
+  TileCount count;
+  for (const auto& [source, range] : {std::pair{&kElevation, plan->elevation}, std::pair{&kImagery, plan->imagery}})
+  {
+    for (const TileId& tile : tiles_of(range))
+    {
+      ++count.total;
+      std::error_code ec;
+      if (!std::filesystem::exists(cache_path(options.cache_dir, *source, tile), ec))
+      {
+        ++count.uncached;
+      }
+    }
+  }
+  return count;
+}
+
+std::optional<Terrain> build_terrain(const GeoOrigin& origin, const LocalBounds& area, const Options& options,
+                                     std::string& error)
+{
+  const std::optional<TilePlan> plan = plan_tiles(origin, area, error);
+  if (!plan)
+  {
+    return std::nullopt;
+  }
+  const int imagery_zoom = plan->imagery.z;
+  const int elevation_zoom = plan->elevation.z;
+
+  const std::vector<TileId> elevation_tiles = tiles_of(plan->elevation);
+  const std::vector<TileId> imagery_tiles = tiles_of(plan->imagery);
+  Fetcher fetcher(options, static_cast<int>(elevation_tiles.size() + imagery_tiles.size()));
   const auto elevation_bytes = fetcher.get_all(kElevation, elevation_tiles);
+  if (fetcher.stopped())
+  {
+    error = "cancelled";
+    return std::nullopt;
+  }
   ElevationGrid elevation(elevation_zoom);
   for (size_t k = 0; k < elevation_tiles.size(); ++k)
   {
@@ -602,8 +708,12 @@ std::optional<Terrain> build_terrain(const GeoOrigin& origin, const LocalBounds&
                                      : "no elevation tiles available for this area";
     return std::nullopt;
   }
-  const std::vector<TileId> imagery_tiles = tiles_of(imagery_range);
   const auto imagery_bytes = fetcher.get_all(kImagery, imagery_tiles);
+  if (fetcher.stopped())
+  {
+    error = "cancelled";
+    return std::nullopt;
+  }
 
   Terrain terrain;
   terrain.imagery_zoom = imagery_zoom;

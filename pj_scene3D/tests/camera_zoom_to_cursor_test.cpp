@@ -311,3 +311,42 @@ TEST(CameraRelativeView, FocalStaysPixelLockedZoomingAtLargeCoordinates) {
     EXPECT_NEAR(after.y, before.y, 1e-4f) << "scene swam vertically at focal " << far_origin;
   }
 }
+
+// Orbiting about a picked point keeps that point fixed on screen (and its distance to the
+// eye), while the view angles change exactly as a plain rotate() would change them.
+TEST(RotateAbout, PivotStaysPixelLockedAndAnglesMatchRotate) {
+  const glm::vec3 pivot{3.0f, -2.0f, 1.5f};
+  for (const glm::vec2 drag : {glm::vec2{40.0f, 0.0f}, glm::vec2{0.0f, -25.0f}, glm::vec2{-30.0f, 18.0f}}) {
+    OrbitCamera cam = makeOffAxisCamera();
+    OrbitCamera plain = makeOffAxisCamera();
+    const glm::vec2 ndc_before = projectToNdc(pivot, cam.viewMatrix(), cam.projMatrix(kAspect));
+    const float dist_before = glm::length(cam.position() - pivot);
+
+    cam.rotateAbout(pivot, drag.x, drag.y);
+    plain.rotate(drag.x, drag.y);
+
+    const glm::vec2 ndc_after = projectToNdc(pivot, cam.viewMatrix(), cam.projMatrix(kAspect));
+    EXPECT_NEAR(ndc_after.x, ndc_before.x, 1e-4f) << "drag=(" << drag.x << "," << drag.y << ")";
+    EXPECT_NEAR(ndc_after.y, ndc_before.y, 1e-4f) << "drag=(" << drag.x << "," << drag.y << ")";
+    EXPECT_NEAR(glm::length(cam.position() - pivot), dist_before, 1e-4f);
+    EXPECT_NEAR(cam.state().azimuth, plain.state().azimuth, 1e-6f);
+    EXPECT_NEAR(cam.state().elevation, plain.state().elevation, 1e-6f);
+    EXPECT_NEAR(cam.state().radius, plain.state().radius, 1e-6f);
+  }
+}
+
+TEST(RotateAbout, PivotAtFocalIsPlainRotate) {
+  OrbitCamera cam = makeOffAxisCamera();
+  OrbitCamera plain = makeOffAxisCamera();
+  cam.rotateAbout(cam.state().focal, 35.0f, -12.0f);
+  plain.rotate(35.0f, -12.0f);
+  const glm::vec3 delta = cam.state().focal - plain.state().focal;
+  EXPECT_NEAR(glm::length(delta), 0.0f, 1e-5f);
+}
+
+TEST(RotateAbout, XYOrbitKeepsItsGroundPivot) {
+  XYOrbitCamera cam;
+  cam.adoptState(makeOffAxisCamera().state());
+  cam.rotateAbout(glm::vec3{3.0f, -2.0f, 1.5f}, 40.0f, 10.0f);
+  EXPECT_NEAR(cam.state().focal.z, 0.0f, 1e-6f);
+}

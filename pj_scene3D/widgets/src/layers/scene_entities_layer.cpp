@@ -293,6 +293,8 @@ void SceneEntitiesLayer::resetReplayState() {
   entities_.clear();
   entity_expiry_anchor_ns_.clear();
   model_frames_.clear();
+  focus_entity_.reset();
+  focus_scanned_entries_ = 0;
   state_built_at_.reset();
   applied_uid_high_ = {};
   snapshot_cache_.clear();
@@ -363,6 +365,78 @@ void SceneEntitiesLayer::renderShadowCasters(const glm::mat4& light_view_proj, c
   }
   ensureModelStateAt(frame_ctx.time);
   mesh_pass_->renderDepthOnly(light_view_proj, modelDrawCallsForFrame(frame_ctx));
+}
+
+std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
+  if (ctx_.session == nullptr) {
+    return std::nullopt;
+  }
+  if (!focus_entity_.has_value()) {
+    // A model topic carries its model in its first message or close to it; the cap keeps
+    // a markers-only topic from being decoded end to end on every retry.
+    constexpr std::size_t kMaxScannedEntries = 16;
+    PJ::ObjectStore& store = ctx_.session->objectStore();
+    const std::size_t available = std::min(store.entryCount(topic_id_), kMaxScannedEntries);
+    if (available <= focus_scanned_entries_) {
+      return std::nullopt;
+    }
+    const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
+    for (std::size_t index = focus_scanned_entries_; index < available && !focus_entity_.has_value(); ++index) {
+      const auto entry = store.at(topic_id_, index);
+      if (!entry.has_value() || entry->payload.bytes.empty()) {
+        continue;
+      }
+      auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, entry->timestamp, entry->payload);
+      const auto* batch = obj.has_value() ? obj->object.get<PJ::sdk::SceneEntities>() : nullptr;
+      if (batch == nullptr) {
+        continue;
+      }
+      for (const PJ::sdk::SceneEntity& entity : batch->entities) {
+        if (!entity.models.empty() && !entity.frame_id.empty()) {
+          focus_entity_ = entity;
+          break;
+        }
+      }
+    }
+    focus_scanned_entries_ = available;
+    if (!focus_entity_.has_value()) {
+      return std::nullopt;
+    }
+  }
+  for (std::size_t i = 0; i < focus_entity_->models.size(); ++i) {
+    startMeshLoadIfNeeded(meshKey(topic_id_, focus_entity_->id, i), focus_entity_->models[i]);
+  }
+  pollMeshLoads();
+  // An unloaded mesh measures as the placeholder cube, so wait for every load to land and
+  // leave out the ones that failed.
+  std::vector<MeshRenderPass::DrawCall> draws;
+  for (std::size_t i = 0; i < focus_entity_->models.size(); ++i) {
+    const PJ::sdk::ModelPrimitive& primitive = focus_entity_->models[i];
+    const std::string key = meshKey(topic_id_, focus_entity_->id, i);
+    const MeshLoadEntry* load = mesh_loads_->find(key);
+    if (load == nullptr) {
+      continue;  // no loadable source
+    }
+    if (!load->consumed) {
+      return std::nullopt;
+    }
+    if (load->failed) {
+      continue;
+    }
+    MeshRenderPass::DrawCall draw;
+    draw.kind = MeshRenderPass::GeometryKind::kMesh;
+    draw.mesh_key = key;
+    draw.model = glm::scale(poseToMat4(primitive.pose), toVec3(primitive.scale));
+    draws.push_back(std::move(draw));
+  }
+  if (draws.empty()) {
+    return std::nullopt;
+  }
+  const AABB bounds = mesh_pass_->worldBoundsOfDraws(draws);
+  if (!bounds.valid) {
+    return std::nullopt;
+  }
+  return ModelFocus{focus_entity_->frame_id, bounds};
 }
 
 bool SceneEntitiesLayer::bootstrap() {
