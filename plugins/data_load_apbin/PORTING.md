@@ -141,9 +141,17 @@ constant (472 335.072 s, ±256 ns double rounding).
   holding the airframe's GLB as an inline `ModelPrimitive` (`model/gltf-binary`).
   - Airframe from the board name in the boot messages (first word of a MSG):
     `Pixhawk6C-bdshot`/`AB-TRT` -> TRT (`TRT.glb`), `AB-MOD` -> MOD (`TRT_MOD.glb`),
-    `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no model.
-  - Model files are not in the repository: `AIRBOUND_MODELS_DIR`, else `models/` next to the
-    plugin library. Missing file: warning naming the path.
+    `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no 3D view data (see below).
+  - Model files are Airbound's own and never go into this public repository, the installer or the
+    registry ZIP: users provide them out of band (2026-11-12). Folder: `AIRBOUND_MODELS_DIR` when
+    set, else the per-user folder (`%LOCALAPPDATA%\Airbound\PlotJuggler\models` on Windows,
+    `$XDG_DATA_HOME` or `~/.local/share` + `/airbound/plotjuggler/models` elsewhere). Deliberately
+    not next to the plugin library: under Program Files that needs admin rights and is wiped by
+    updates, and it would invite bundling the models. The whole 3D view data needs the model: when
+    the board is unknown or its model is missing or unusable, an info message names the folder to
+    copy it into and no `_3D` topic is published at all (no frames, model or terrain, and no tile
+    downloads); the plot data is unchanged (AA-TRT-0051 without the model: the same 2320 series,
+    no object topics).
   - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y. The 3D
     view's mesh loader converts glTF's Y-up to Z-up on import ((x, y, z) -> (x, -z, y)), so the
     loaded mesh has the nose +Y, right wing +X, up +Z, and the pose rotation maps THAT to the

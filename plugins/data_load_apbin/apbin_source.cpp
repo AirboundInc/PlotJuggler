@@ -44,18 +44,6 @@
 #include "logformat.h"
 #include "terrain.h"
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
-
 // Debugging
 //#define DEBUG_RUNTIME
 //#define DEBUG_MESSAGES
@@ -248,32 +236,39 @@ std::array<double, 3> rotate(const PJ::sdk::Quaternion& q, const std::array<doub
   return {v[0] + 2.0 * (q.w * t[0] + ut[0]), v[1] + 2.0 * (q.w * t[1] + ut[1]), v[2] + 2.0 * (q.w * t[2] + ut[2])};
 }
 
-// Folder holding this plugin's library, for assets installed next to it.
-std::filesystem::path plugin_directory()
+// The per-user folder for the aircraft models, which are not shipped with the plugin (they are
+// Airbound's own and the repository is public): %LOCALAPPDATA%\Airbound\PlotJuggler\models on
+// Windows, $XDG_DATA_HOME (or ~/.local/share)/airbound/plotjuggler/models elsewhere. Empty when
+// neither variable is set.
+std::filesystem::path user_models_dir()
 {
 #ifdef _WIN32
-  HMODULE module = nullptr;
-  if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                          reinterpret_cast<LPCWSTR>(&plugin_directory), &module))
+  if (const char* local = std::getenv("LOCALAPPDATA"); local != nullptr && *local != '\0')
   {
-    return {};
+    return std::filesystem::path(local) / "Airbound" / "PlotJuggler" / "models";
   }
-  std::wstring path(MAX_PATH, L'\0');
-  DWORD length = 0;
-  while ((length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()))) == path.size())
-  {
-    path.resize(path.size() * 2);
-  }
-  path.resize(length);
-  return std::filesystem::path(path).parent_path();
 #else
-  Dl_info info{};
-  if (dladdr(reinterpret_cast<void*>(&plugin_directory), &info) == 0 || info.dli_fname == nullptr)
+  if (const char* xdg = std::getenv("XDG_DATA_HOME"); xdg != nullptr && *xdg != '\0')
   {
-    return {};
+    return std::filesystem::path(xdg) / "airbound" / "plotjuggler" / "models";
   }
-  return std::filesystem::path(info.dli_fname).parent_path();
+  if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0')
+  {
+    return std::filesystem::path(home) / ".local" / "share" / "airbound" / "plotjuggler" / "models";
+  }
 #endif
+  return {};
+}
+
+// Where the models are looked for: AIRBOUND_MODELS_DIR when set, else the per-user folder. Never
+// next to the plugin: that would invite shipping them in the installer or registry ZIP.
+std::filesystem::path models_dir()
+{
+  if (const char* env = std::getenv("AIRBOUND_MODELS_DIR"); env != nullptr && *env != '\0')
+  {
+    return env;
+  }
+  return user_models_dir();
 }
 
 // Axis-aligned bounds of a GLB model's meshes in model coordinates (node transforms applied),
@@ -639,8 +634,17 @@ private:
   // FMTU), else 1: the factor that turns the stored value into its base unit.
   double centi_factor(const std::string& msg_name, uint8_t field_idx);
 
-  // The model topics: the detected airframe's GLB model as a scene entity locked to the vehicle
-  // frame from `first_pose_ns` on (kVehicleTopic), and a translucent copy on the setpoint frame
+  // PJ4: the detected airframe's model, placed for the vehicle frame (pose, scale and GLB data).
+  // The 3D view topics are published only with it: without a model there is no _3D data at all.
+  std::optional<PJ::sdk::ModelPrimitive> vehicle_model_;
+  const AirframeModel* vehicle_airframe_ = nullptr;  // the kAirframeModels entry of vehicle_model_
+
+  // Detects the airframe from the boot messages and loads its model into vehicle_model_. Leaves
+  // it empty, with an info message, for an unknown board or a model that is not available.
+  void load_vehicle_model();
+
+  // The model topics: vehicle_model_ as a scene entity locked to the vehicle frame from
+  // `first_pose_ns` on (kVehicleTopic), and a translucent copy on the setpoint frame
   // shown only during each [start, end] run in `setpoint_runs`, the topic ending at
   // `last_pose_ns` (kSetpointTopic). Problems only warn; the load still succeeds.
   void publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
@@ -695,6 +699,8 @@ PJ::Status APBinSource::readDataFromFile()
   scaled_fields.clear();
   time_offset_s = 0.0;
   frame_transforms_.clear();
+  vehicle_model_.reset();
+  vehicle_airframe_ = nullptr;
 
   for (uint16_t i = 0; i < MAX_FORMATS; i++)
   {
@@ -1292,9 +1298,14 @@ PJ::Status APBinSource::readDataFromFile()
 
 
 
-  // PJ4: the 3D view's transforms, and the terrain's share of the progress bar.
-  collect_vehicle_transforms(frame_transforms_);
-  collect_setpoint_transforms(frame_transforms_);
+  // PJ4: the 3D view's transforms, and the terrain's share of the progress bar. All of the _3D
+  // data needs the aircraft model, which users provide out of band: without it, none is published.
+  load_vehicle_model();
+  if (vehicle_model_)
+  {
+    collect_vehicle_transforms(frame_transforms_);
+    collect_setpoint_transforms(frame_transforms_);
+  }
   terrain_cost_s_ = terrain_cost();
   progress_->set_cost(kStageTerrain, terrain_cost_s_);
   progress_->set_cost(kStageRows, static_cast<double>(row_count()) / 0.7e6);
@@ -1691,8 +1702,7 @@ PJ::Status APBinSource::publish_transforms()
 }
 
 
-void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
-                                        const std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>>& setpoint_runs)
+void APBinSource::load_vehicle_model()
 {
   // Airframe from the board name ArduPilot prints at boot: the first word of that message.
   const AirframeModel* airframe = nullptr;
@@ -1716,27 +1726,26 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timesta
   {
     runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
                                 "ArduPilot Bin: no known Airbound flight controller board in the boot messages, no 3D "
-                                "aircraft model");
+                                "view data");
     return;
   }
 
-  // Models are not part of the repository: AIRBOUND_MODELS_DIR, else "models" next to this plugin.
-  std::filesystem::path models_dir;
-  if (const char* env = std::getenv("AIRBOUND_MODELS_DIR"); env != nullptr && *env != '\0')
+  // The models are provided out of band (see models_dir). Optional: without one the load goes on
+  // with the plot data only.
+  const std::filesystem::path dir = models_dir();
+  const std::filesystem::path model_path = dir / airframe->model_file;
+  std::ifstream file;
+  if (!dir.empty())
   {
-    models_dir = env;
+    file.open(model_path, std::ios::binary);
   }
-  else
+  if (!file.is_open())
   {
-    models_dir = plugin_directory() / "models";
-  }
-  const std::filesystem::path model_path = models_dir / airframe->model_file;
-  std::ifstream file(model_path, std::ios::binary);
-  if (!file)
-  {
-    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
-                                std::string("ArduPilot Bin: ") + airframe->airframe + " model not found at " +
-                                    model_path.string() + ", no 3D aircraft model");
+    runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kInfo,
+                                std::string("ArduPilot Bin: ") + airframe->airframe + " model " + airframe->model_file +
+                                    " not found, no 3D view data" +
+                                    (dir.empty() ? std::string(". Set AIRBOUND_MODELS_DIR to the folder holding it")
+                                                 : ". Copy it into " + dir.string()));
     return;
   }
   std::vector<uint8_t> glb((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -1744,7 +1753,7 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timesta
   if (!bounds || !(bounds->max_extent > 0.0))
   {
     runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,
-                                "ArduPilot Bin: " + model_path.string() + " is not a usable GLB model");
+                                "ArduPilot Bin: " + model_path.string() + " is not a usable GLB model, no 3D view data");
     return;
   }
 
@@ -1759,7 +1768,20 @@ void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timesta
   model.scale = {.x = scale, .y = scale, .z = scale};
   model.media_type = "model/gltf-binary";
   model.data = std::move(glb);
+  vehicle_model_ = std::move(model);
+  vehicle_airframe_ = airframe;
+}
 
+
+void APBinSource::publish_vehicle_model(PJ::Timestamp first_pose_ns, PJ::Timestamp last_pose_ns,
+                                        const std::vector<std::pair<PJ::Timestamp, PJ::Timestamp>>& setpoint_runs)
+{
+  if (!vehicle_model_)
+  {
+    return;
+  }
+  const PJ::sdk::ModelPrimitive& model = *vehicle_model_;
+  const AirframeModel* airframe = vehicle_airframe_;
   const auto* object_host = objectWriteHost();
   if (object_host == nullptr)
   {
