@@ -7,6 +7,13 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(PNG REQUIRED)
 
+# Airframe model splitting and the moving-part config (no SDK types), shared with the tests.
+add_library(apbin_airframe_model STATIC airframe_model.cpp airframe_model.h)
+target_compile_features(apbin_airframe_model PUBLIC cxx_std_20)
+target_include_directories(apbin_airframe_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(apbin_airframe_model PRIVATE nlohmann_json::nlohmann_json)
+set_target_properties(apbin_airframe_model PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 add_library(apbin_source_plugin SHARED
     apbin_source.cpp
     logformat.h
@@ -14,6 +21,7 @@ add_library(apbin_source_plugin SHARED
     terrain.h)
 target_compile_features(apbin_source_plugin PRIVATE cxx_std_20)
 target_link_libraries(apbin_source_plugin PRIVATE
+    apbin_airframe_model
     plotjuggler_sdk::plugin_sdk
     nlohmann_json::nlohmann_json
     CURL::libcurl
@@ -36,6 +44,14 @@ target_compile_features(apbin_dump PRIVATE cxx_std_20)
 target_link_libraries(apbin_dump PRIVATE plotjuggler_sdk::plugin_sdk nlohmann_json::nlohmann_json)
 # Keep it out of the plugin folder the app scans.
 set_target_properties(apbin_dump PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/airbound_tools>")
+
+if(PJ_BUILD_TESTS AND COMMAND pj_add_test_runner)
+    pj_add_test_runner(apbin_plugin_tests
+        MAIN plain
+        SOURCES tests/airframe_model_test.cpp
+        LIBS apbin_airframe_model nlohmann_json::nlohmann_json
+    )
+endif()
 
 # `build.bat --minimal` only builds pj_app; make it build this plugin too.
 if(TARGET pj_app)

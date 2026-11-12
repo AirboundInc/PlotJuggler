@@ -480,6 +480,35 @@ int main(int argc, char** argv) {
     }
     std::printf("\n");
 
+    // Per edge: the range of the rotation angle (degrees) and the largest translation, so moving
+    // parts (vehicle -> vehicle/<part>) can be checked for actual motion.
+    struct Turn {
+      double min_deg = 1e9;
+      double max_deg = -1e9;
+      double max_shift_m = 0.0;
+    };
+    std::map<std::string, Turn> turns;
+    for (const auto& [ts, bytes] : object.entries) {
+      if (const auto decoded = PJ::deserializeFrameTransforms(bytes.data(), bytes.size())) {
+        for (const auto& tf : decoded->transforms) {
+          Turn& turn = turns[tf.parent_frame_id + "->" + tf.child_frame_id];
+          const double w = std::clamp(std::abs(tf.rotation.w), 0.0, 1.0);
+          const double deg = 2.0 * std::acos(w) * 180.0 / 3.14159265358979323846;
+          turn.min_deg = (std::min)(turn.min_deg, deg);
+          turn.max_deg = (std::max)(turn.max_deg, deg);
+          turn.max_shift_m = (std::max)(turn.max_shift_m, std::sqrt(tf.translation.x * tf.translation.x +
+                                                                  tf.translation.y * tf.translation.y +
+                                                                  tf.translation.z * tf.translation.z));
+        }
+      }
+    }
+    for (const auto& [edge, turn] : turns) {
+      if (edge.rfind("vehicle->", 0) == 0 || edge.find("->vehicle/") != std::string::npos) {
+        std::printf("TFTURN %s angle=%.2f..%.2f deg shift<=%.3f m\n", edge.c_str(), turn.min_deg, turn.max_deg,
+                    turn.max_shift_m);
+      }
+    }
+
     // A few evenly spaced samples, decoded, with the heading implied by the rotation
     // (ENU yaw of the body x axis, converted back to a compass bearing).
     const size_t n = object.entries.size();

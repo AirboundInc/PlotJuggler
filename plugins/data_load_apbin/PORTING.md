@@ -142,8 +142,8 @@ constant (472 335.072 s, ±256 ns double rounding).
   - Airframe from the board name in the boot messages (first word of a MSG):
     `Pixhawk6C-bdshot`/`AB-TRT` -> TRT (`TRT.glb`), `AB-MOD` -> MOD (`TRT_MOD.glb`),
     `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no model.
-  - Model files are not in the repository: `AIRBOUND_MODELS_DIR`, else `models/` next to the
-    plugin library. Missing file: warning naming the path.
+  - Model files (and their moving-part configs) are not in the repository: `AIRBOUND_MODELS_DIR`,
+    else `models/` next to the plugin library. Missing file: warning naming the path.
   - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y. The 3D
     view's mesh loader converts glTF's Y-up to Z-up on import ((x, y, z) -> (x, -z, y)), so the
     loaded mesh has the nose +Y, right wing +X, up +Z, and the pose rotation maps THAT to the
@@ -166,8 +166,34 @@ constant (472 335.072 s, ±256 ns double rounding).
     message). It is a deletion because an empty batch serializes to no bytes and the codec rejects
     that. AA-TRT-0051: `_3D/vehicle count=1`, `_3D/setpoint count=3` (2 runs), t1 = the last
     vehicle pose.
-  - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
-    servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`).
+  - Control-surface animation (2026-11-12), `airframe_model.{h,cpp}`:
+    - Config: `<model>.json` next to the GLB (`TRT.json`, ...), the Airbound web log viewer's
+      format unchanged, so a config copied from its Models panel works as is. Per surface: servo
+      `channel`, `nodeName`, `hingeLocalAxis`, `angleAtMin`/`angleAtMax` (radians, 0 at trim),
+      `reverse`; `pwmSource: "auto"` takes the PWM range from `SERVOn_MIN/TRIM/MAX` (ArduPilot's
+      1100/1500/1900 when invalid), otherwise the surface's `pwmMin/pwmNeutral/pwmMax`. `motors`
+      are ignored (propellers do not spin). No config: rigid model, as before.
+    - The 3D view bakes a GLB into one rigid mesh, so the model is split: each surface's node with
+      its descendants (minus nested surfaces) becomes its own GLB, the rest is the body. Every piece
+      keeps only the meshes, materials, textures and buffer bytes it uses, and draws at its rest
+      place in model space, so body + parts assemble into the original model. AA-TRT-0051 (TRT):
+      body 7.7 MB, four parts 0.4-0.9 MB; the setpoint copy stays the whole, rigid model.
+    - Each part is an entity `aircraft_<name>` locked to the frame `vehicle/<name>` (`~CS_ELEVON_L`
+      -> `vehicle/elevon_l`), placed like the body. The frame's parent is `vehicle`, or the
+      enclosing surface's frame for nested ones (TRT_MOD/V2 wrists on elbows), and its transform
+      is the turn about the hinge in the vehicle frame: angle from the web viewer's PWM mapping
+      (`pwm_to_angle`, piecewise linear around trim, clamped) of the logged output (`RCOU` C1-C14,
+      `RCO2` C15-C18), pivot and axis from the node's rest place mapped like the model (scale,
+      Y-up to Z-up, placement pose). The turn matches the web viewer's `rest * axis_angle` on the
+      node; a mirrored frame above the node flips its sign. A surface under a non-uniformly
+      scaled node, a missing node or a node with a `matrix` stays on the body with a warning.
+    - Only angle changes are published (steps under 0.05 degrees are dropped, keeping the sample
+      before each change so interpolation holds the angle), plus a rest transform at the first
+      vehicle pose. AA-TRT-0051: 5652 RCOU samples -> 3060-5088 transforms per surface.
+    - Tests: `apbin_plugin_tests` (synthetic GLB: split contents, rest places, motion equal to the
+      node rotation also under a mirrored root, the PWM mapping, the config format). With
+      `AIRBOUND_MODELS_DIR` set it also splits the real models: every surface of TRT, TRT_MOD and V2
+      becomes a part, without warnings, and the pieces' bounds union equals the whole model's.
 - **Terrain for the 3D view (2026-11-04).** Object topic `_3D/terrain` (`kSceneEntities`): one
   entity `terrain` on `world`, published at the first vehicle pose, holding a GLB built in memory
   by `terrain.{h,cpp}`: satellite imagery draped over an elevation model around the flight.
