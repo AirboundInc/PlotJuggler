@@ -231,7 +231,20 @@ void OrbitCamera::zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int view
 
 void OrbitCamera::zoomToSurface(
     float scroll_ticks, const glm::vec3& surface, glm::vec2 /*cursor_px*/, int /*viewport_w*/, int /*viewport_h*/) {
+  const CameraState before = state_;
   zoomAbout(scroll_ticks, surface);
+  if (scroll_ticks <= 0.0f) {
+    return;
+  }
+  // The radius floor alone lets the eye pass the surface's near plane, which the scene's
+  // extent can hold well above it: stop while the surface is still clearly in front.
+  constexpr float kNearMargin = 2.0f;
+  float near_plane = 0.0f;
+  float far_plane = 0.0f;
+  adaptiveNearFar(state_.radius, sceneReach(scene_bounds_, state_.focal), near_plane, far_plane);
+  if (glm::length(position() - surface) < kNearMargin * near_plane) {
+    state_ = before;
+  }
 }
 
 void OrbitCamera::zoomAbout(float scroll_ticks, const glm::vec3& target) {

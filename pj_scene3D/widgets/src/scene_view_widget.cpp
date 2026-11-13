@@ -349,6 +349,9 @@ bool SceneViewWidget::focusOnFrameBounds(const std::string& frame, const AABB& f
   CameraState focused = before;
   focused.focal = glm::vec3(center);
   focused.radius = std::max(size * kRadiusPerSize, kMinRadius);
+  // The top-down camera frames by its half-height instead of the radius: the whole
+  // diagonal as the half-height fits the model at any heading and usual aspect.
+  focused.ortho_scale = std::max(size, kMinRadius);
   camera_->adoptState(focused);
   update();
   if (!cameraStatesEqual(before, camera_->state())) {

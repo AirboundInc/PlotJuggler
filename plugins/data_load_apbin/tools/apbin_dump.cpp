@@ -300,12 +300,9 @@ class FakeHost {
     }
     return true;
   }
+  // A rejected push leaves fetch_ctx with the caller, as the production host does.
   static bool pushLazy(
-      void*, PJ_object_topic_handle_t, int64_t, PJ_lazy_fetch_fn_t, void* fetch_ctx, void (*destroy)(void*),
-      PJ_error_t* err) noexcept {
-    if (destroy != nullptr) {
-      destroy(fetch_ctx);
-    }
+      void*, PJ_object_topic_handle_t, int64_t, PJ_lazy_fetch_fn_t, void*, void (*)(void*), PJ_error_t* err) noexcept {
     setError(err, "apbin_dump does not support lazy object entries");
     return false;
   }

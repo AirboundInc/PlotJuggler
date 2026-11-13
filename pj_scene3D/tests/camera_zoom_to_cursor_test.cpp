@@ -397,10 +397,11 @@ TEST(RotateAbout, RecentresTheOrbitOnThePivot) {
 }
 
 // Scrolling with the cursor on a model zooms towards the model, not towards the ground plane
-// behind it, so the camera gets close and the model never falls in front of the near plane.
+// behind it, so the camera gets close and the model never falls in front of the near plane,
+// however long the scroll goes on.
 TEST(ZoomToCursor, OnAHoveringModelGetsCloseWithoutClippingIt) {
   OrbitCamera cam = makeHoveringModelCamera(40.0f);  // focal on the model
-  for (int tick = 0; tick < 40; ++tick) {
+  for (int tick = 0; tick < 120; ++tick) {
     cam.zoomToSurface(1.0f, kHoveringModel, kCentrePixel, kW, kH);  // the depth-picked point
     const float distance = glm::length(cam.position() - kHoveringModel);
     ASSERT_GT(distance, nearPlane(cam)) << "model clipped at tick " << tick;

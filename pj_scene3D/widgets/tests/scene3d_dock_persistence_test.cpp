@@ -1362,4 +1362,42 @@ TEST(Scene3DDockPersistence, TrailRestoreRejectsMalformedElements) {
   EXPECT_TRUE(try_restore(u"tf_frame"_s, u"base"_s, u"banana"_s)) << "malformed order must reject";
 }
 
+TEST(Scene3DDockPersistence, RejectedTopicFromSecondDatasetKeepsTransformBinding) {
+  PJ::SessionManager session;
+  pj::scene3d::TransformService transform_service(session);
+  const DatasetTopic a = registerTfDataset(session, "a.dat", "/tf_a");
+  const DatasetTopic b = registerDepthDataset(session, "b.dat", "/camera", /*push_sample=*/false);
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(a.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_a"_s));
+
+  // B's image fails the depth gate (no depth sample), so the dock must stay on A.
+  EXPECT_FALSE(dock.addTopic(b.topic_id, PJ::sdk::BuiltinObjectType::kImage, u"camera"_s));
+  EXPECT_EQ(dock.boundDatasetIdForTest(), a.dataset_id);
+  EXPECT_TRUE(dock.hasTransformBufferForTest());
+  QDomDocument state_doc;
+  const QDomElement state = dock.xmlSaveState(state_doc);
+  EXPECT_FALSE(state.firstChildElement(u"config_topic"_s).isNull()) << "A's TF config must survive the rejection";
+}
+
+TEST(Scene3DDockPersistence, PoseTrailKeepsDockOnItsDataset) {
+  PJ::SessionManager session;
+  pj::scene3d::TransformService transform_service(session);
+  const DatasetTopic a = registerTfDataset(session, "a.dat", "/tf_a");
+  const PJ::ObjectTopicId pose_topic = registerPoseTopic(session, a.dataset_id, "/odom");
+  const DatasetTopic b = registerTfDataset(session, "b.dat", "/tf_b");
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(a.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_a"_s));
+  ASSERT_NE(dock.addTrailLayer(pj::scene3d::TrailSource::poseTopic(pose_topic)).id, 0U);
+
+  // The trail reads A's pose topic: resolving it against B's TF tree would be wrong.
+  EXPECT_FALSE(dock.addTopic(b.topic_id, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"tf_b"_s));
+  EXPECT_EQ(dock.boundDatasetIdForTest(), a.dataset_id);
+}
+
 }  // namespace

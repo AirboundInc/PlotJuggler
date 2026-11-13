@@ -2477,6 +2477,7 @@ void SceneViewWidget::render(QRhiCommandBuffer* command_buffer) {
     glm::vec4 override_color{1.0F};
     bool use_material = true;
     WasmModelDrawGroup group = WasmModelDrawGroup::kIndependent;
+    bool replace_materials = false;  // WasmModelDrawCall::replace_materials
   };
   struct PreparedModelLayer {
     WasmModelRenderable* layer = nullptr;
@@ -2555,7 +2556,8 @@ void SceneViewWidget::render(QRhiCommandBuffer* command_buffer) {
       }
       const AABB draw_bounds = transformedModelBounds(bounds->second, fixed_from_model);
       const PreparedModelCall call{draw.mesh_key,       mesh->second,      fixed_from_model,
-                                   draw.override_color, draw.use_material, draw.group};
+                                   draw.override_color, draw.use_material, draw.group,
+                                   draw.replace_materials};
       if (color_requested) {
         layer_bounds = unionAABB(layer_bounds, draw_bounds);
         prepared.color_calls.push_back(call);

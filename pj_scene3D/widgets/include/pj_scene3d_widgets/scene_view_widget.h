@@ -87,8 +87,8 @@ class SceneViewWidget : public QOpenGLWidget {
   // policy — the "Follow frame" recenter button drives it. No-op when not following
   // or the frame can't be resolved.
   void recenterOnFollowFrame();
-  // Centre the camera on `frame_bounds` (a box in `frame`) and set the orbit radius to a
-  // few times its size, keeping the view angles. The frame is placed at render_time_,
+  // Centre the camera on `frame_bounds` (a box in `frame`) and size the view to fit it (the
+  // orbit radius, and the top-down half-height), keeping the view angles. The frame is placed at render_time_,
   // or at its first TF sample when the playhead is before it. False (camera untouched)
   // when the frame can't be placed in the fixed frame.
   bool focusOnFrameBounds(const std::string& frame, const AABB& frame_bounds);

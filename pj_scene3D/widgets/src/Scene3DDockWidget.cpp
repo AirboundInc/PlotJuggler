@@ -624,16 +624,6 @@ bool Scene3DDockWidget::addTopicImpl(
   if (object_type == sdk::BuiltinObjectType::kFrameTransforms && config_topics_.contains(topic_id.id)) {
     return true;
   }
-  bool switched_dataset = false;
-  if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
-    const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
-    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
-      if (!releaseBindingHeldOnlyByConfigTopics()) {
-        return false;
-      }
-      switched_dataset = true;
-    }
-  }
   if (!handlesObjectType(object_type)) {
     qCWarning(lcScene3DDock) << "addTopic: unsupported object_type" << static_cast<int>(object_type);
     return false;
@@ -646,6 +636,18 @@ bool Scene3DDockWidget::addTopicImpl(
   if (enforce_image_gate && object_type == sdk::BuiltinObjectType::kImage &&
       !firstSampleIsDepthEncoded(*sessionManager(), topic_id)) {
     return false;
+  }
+  // Only once the topic is known to be accepted: releasing the binding drops the current
+  // dataset's TF configuration, which a rejected topic must not cost the dock.
+  bool switched_dataset = false;
+  if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
+    const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
+    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
+      if (!releaseBindingHeldOnlyByConfigTopics()) {
+        return false;
+      }
+      switched_dataset = true;
+    }
   }
 
   const bool accepted = SceneDockWidget::addTopic(topic_id, object_type, title);
@@ -1038,6 +1040,15 @@ bool Scene3DDockWidget::releaseBindingHeldOnlyByConfigTopics() {
   for (const auto& [topic, dataset] : scene_topic_datasets_) {
     if (dataset == dataset_id_ && !config_topics_.contains(topic)) {
       return false;  // a render layer of the bound dataset is still in the dock
+    }
+  }
+  // Pose trails have a local id, so scene_topic_datasets_ does not see their source topic.
+  ObjectStore& store = sessionManager()->objectStore();
+  for (const SceneLayerInfo& info : layers()) {
+    const auto* trail = dynamic_cast<const pj::scene3d::TrailLayer*>(layerFor(info.topic_id));
+    if (trail != nullptr && trail->source().kind == pj::scene3d::TrailSource::Kind::kPoseTopic &&
+        store.descriptor(trail->source().topic).dataset_id == dataset_id_) {
+      return false;  // a pose trail of the bound dataset is still in the dock
     }
   }
   for (auto it = config_topics_.begin(); it != config_topics_.end();) {

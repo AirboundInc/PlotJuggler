@@ -385,7 +385,8 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   real entity reuses them; nothing is folded, so the playhead can be anywhere.
   `SceneViewWidget::focusOnFrameBounds` then centres the orbit on the box, placing the
   frame at the playhead or, before its first pose, at `TransformBuffer::getEarliestSample`,
-  with radius 2.5x the box diagonal; the dock then follows that frame (seeding at
+  with radius 2.5x the box diagonal (and the diagonal as the top-down camera's
+  half-height, which it frames by instead); the dock then follows that frame (seeding at
   first appearance keeps the camera on it). Retried on the layer's (queued)
   `repaintRequested` and on TF readiness; dropped when the user picks a follow frame
   first, the layer goes away, or the model's frame is the fixed frame (a static model:
@@ -409,7 +410,10 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   over geometry it calls `ICamera::zoomToSurface(ticks, surface, ...)`, a homothety about
   the picked point (`OrbitCamera::zoomAbout`, shared with `zoomToCursor`), so a model
   above the ground is closed in on instead of flown past towards the z=0 / focal-plane
-  anchor `zoomToCursor` uses. Over background it keeps `zoomToCursor`. `XYOrbitCamera`
+  anchor `zoomToCursor` uses. An inward tick that would bring the picked point within
+  twice the near plane is undone: the near plane is held up by the scene's extent (depth
+  ratio cap), not just the radius, so the radius floor alone let the model clip. Over
+  background it keeps `zoomToCursor`. `XYOrbitCamera`
   (ground lock), Fly and TopDown ignore the surface.
 - **A followed frame stays the orbit and zoom centre.** While `follow_frame_` is set,
   neither the press nor the wheel picks: drags call plain `rotate()` and the wheel calls
@@ -1156,6 +1160,10 @@ tap writes route to a private staging buffer while docks retain the active one.
 `commitReplacingLoad` atomically swaps the staging pointer into the active slot,
 then emits `datasetTransformsReady`; docks rebind their view and TF-backed layers.
 `abortReplacingLoad` drops staging, so rollback performs no ObjectStore reads.
+Canonical (parser-less) TF topics never pass the tap, so while a generation is
+staging `ingestNewTransforms` leaves them alone (draining them would put the reload's
+transforms into the generation on screen); `commitReplacingLoad` resets the drain
+cursors and drains them into the new active buffer before notifying the docks.
 
 `ingestFrameTransformsForDataset` remains an explicit full-store rebuild. Dataset
 merge invalidates the affected buffers and calls it for the anchor because merged

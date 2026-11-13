@@ -265,8 +265,8 @@ class ICamera {
   virtual void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) = 0;
   // zoomToCursor() when the cursor is over geometry: `surface` is the world point under it
   // (from the depth buffer), which stays pixel-locked and is what the zoom closes in on,
-  // instead of the ground or focal plane behind it. Models without a free orbit pivot
-  // ignore `surface`.
+  // instead of the ground or focal plane behind it, stopping before `surface` would reach
+  // the near plane. Models without a free orbit pivot ignore `surface`.
   virtual void zoomToSurface(
       float scroll_ticks, const glm::vec3& /*surface*/, glm::vec2 cursor_px, int viewport_w, int viewport_h) {
     zoomToCursor(scroll_ticks, cursor_px, viewport_w, viewport_h);

@@ -233,6 +233,27 @@ TEST(Scene3DFollow, RecenterOnFollowFrameCentersCameraOnTarget) {
   EXPECT_NEAR(focal.z, 5.0f, 1e-4f);
 }
 
+// --- View: focusing a frame's bounds in top-down fits them, not just recenters. ---
+TEST(Scene3DFollow, FocusOnFrameBoundsFitsTopDownView) {
+  auto buf = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);
+  setEdge(*buf, "world", "robot", 100, {3.0, 4.0, 0.0});
+
+  SceneViewWidget view;
+  view.setTransformBuffer(buf);
+  view.setFixedFrame("world");
+  view.setCameraModel(SceneViewWidget::CameraModel::kTopDownOrtho);
+  view.setTrackerTime(at(100));
+  // Far wider than the default ortho half-height: only a fitted scale shows all of it.
+  const pj::scene3d::AABB bounds{.min = {-50.0f, -50.0f, -1.0f}, .max = {50.0f, 50.0f, 1.0f}, .valid = true};
+  ASSERT_TRUE(view.focusOnFrameBounds("robot", bounds));
+
+  const pj::scene3d::CameraState state = view.camera().state();
+  EXPECT_FALSE(state.perspective);
+  EXPECT_NEAR(state.focal.x, 3.0f, 1e-3f);
+  EXPECT_NEAR(state.focal.y, 4.0f, 1e-3f);
+  EXPECT_GE(state.ortho_scale, 50.0f) << "the ortho half-height must cover the frame's bounds";
+}
+
 // --- Dock: the follow target round-trips through layout XML. ---
 TEST(Scene3DFollow, DockFollowFrameRoundTripsThroughLayout) {
   PJ::SessionManager save_session;

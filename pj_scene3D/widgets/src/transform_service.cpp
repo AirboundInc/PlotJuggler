@@ -273,6 +273,7 @@ void TransformService::commitReplacingLoad(PJ::DatasetId dataset_id) {
     slot.replacement_in_progress = false;
   }
   resetDrainState(dataset_id);
+  (void)ingestNewerThanCursor(dataset_id, /*canonical_only=*/true);  // held back while staging
   emit datasetTransformsReady(dataset_id);
 }
 
@@ -371,6 +372,15 @@ bool TransformService::ingestNewTransforms(PJ::DatasetId dataset_id) {
   Q_ASSERT(QThread::currentThread() == thread());
   // The tap only sees parser-routed bytes; canonical topics pushed by a data
   // source or toolbox (serialized FrameTransforms, no parser) must be drained here.
+  if (tap_active_) {
+    std::lock_guard lock(tap_mutex_);
+    if (const auto it = transform_buffers_.find(dataset_id);
+        it != transform_buffers_.end() && it->second.staging != nullptr) {
+      // A replacing load is staging its generation: its canonical transforms must not
+      // reach the one on screen. commitReplacingLoad drains them into the new one.
+      return false;
+    }
+  }
   return ingestNewerThanCursor(dataset_id, /*canonical_only=*/tap_active_);
 }
 

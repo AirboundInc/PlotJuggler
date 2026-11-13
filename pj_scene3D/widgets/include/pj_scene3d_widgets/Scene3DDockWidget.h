@@ -271,7 +271,7 @@ class Scene3DDockWidget : public SceneDockWidget {
   // ONLY by config (TF) topics, which have no layer row the user could remove,
   // drop them and unbind so the new topic rebinds the dock to its own dataset.
   // TF trails are kept: they follow frames by name, so they carry over to the new
-  // tree. Returns false (binding untouched) while a render layer of the bound
+  // tree. Returns false (binding untouched) while a render layer or pose trail of the bound
   // dataset remains — mixing its frames with another tree would be wrong.
   bool releaseBindingHeldOnlyByConfigTopics();
   // Connect to SessionManager::samplesIngested so streamed FrameTransform
