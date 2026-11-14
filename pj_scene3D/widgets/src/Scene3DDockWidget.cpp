@@ -1065,6 +1065,20 @@ bool Scene3DDockWidget::releaseBindingHeldOnlyByConfigTopics() {
   if (view_ != nullptr) {
     view_->setTransformBuffer(nullptr);
   }
+  // Frames the released dataset contributed, including those of its layers removed
+  // earlier, must not reach the next one's frame list (auto-root would pick them).
+  available_frames_.clear();
+  fallback_frames_.clear();
+  for (const SceneLayerInfo& info : layers()) {
+    if (auto* layer = dynamic_cast<Scene3DLayer*>(layerFor(info.topic_id)); layer != nullptr) {
+      for (const QString& frame : layer->fallbackFrames()) {
+        if (std::find(fallback_frames_.begin(), fallback_frames_.end(), frame.toStdString()) ==
+            fallback_frames_.end()) {
+          fallback_frames_.push_back(frame.toStdString());
+        }
+      }
+    }
+  }
   pushTransformBufferToTrailLayers();  // the new topic's bind pushes the new buffer
   return true;
 }

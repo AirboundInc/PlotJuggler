@@ -27,7 +27,8 @@ using namespace Qt::StringLiterals;
 
 namespace {
 
-PJ::ObjectTopicId registerCanonicalEntitiesTopic(PJ::ObjectStore& store, PJ::Timestamp ts, PJ::DatasetId dataset = 1) {
+PJ::ObjectTopicId registerCanonicalEntitiesTopic(
+    PJ::ObjectStore& store, PJ::Timestamp ts, PJ::DatasetId dataset = 1, const std::string& frame = "vehicle") {
   PJ::ObjectTopicDescriptor desc;
   desc.dataset_id = dataset;
   desc.topic_name = "_MODEL";
@@ -37,7 +38,7 @@ PJ::ObjectTopicId registerCanonicalEntitiesTopic(PJ::ObjectStore& store, PJ::Tim
 
   PJ::sdk::SceneEntity entity;
   entity.timestamp = ts;
-  entity.frame_id = "vehicle";
+  entity.frame_id = frame;
   entity.id = "aircraft";
   entity.frame_locked = true;
   PJ::sdk::CubePrimitive cube;
@@ -136,6 +137,42 @@ TEST(Scene3DDockCanonicalEntities, SwitchingLogsReconvertsThePlayhead) {
   ASSERT_TRUE(dock.addTopic(model_b, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
   EXPECT_EQ(dock.lastTrackerNsForTest(), std::optional<int64_t>(kLogBStart))
       << "the playhead must be re-converted against log B, not replayed at log A's clamped instant";
+}
+
+// Frames a removed layer of the old log contributed (here "map", which no transform
+// carries) must not outlive the switch: auto-root prefers "map", so a stale one would
+// become the new log's fixed frame, where none of its layers resolve.
+TEST(Scene3DDockCanonicalEntities, SwitchingLogsDropsTheOldLogsFrames) {
+  PJ::SessionManager session;
+  pj::scene3d::TransformService transform_service(session);
+  PJ::ObjectStore& store = session.objectStore();
+  const PJ::ObjectTopicId tf_a = registerCanonicalTfTopic(store, /*dataset=*/1, 100);
+  const PJ::ObjectTopicId map_a = registerCanonicalEntitiesTopic(store, 100, /*dataset=*/1, "map");
+  registerCanonicalTfTopic(store, /*dataset=*/2, 200);
+  const PJ::ObjectTopicId model_b = registerCanonicalEntitiesTopic(store, 200, /*dataset=*/2);
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(tf_a, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"_TF"_s));
+  ASSERT_TRUE(dock.addTopic(map_a, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MAP"_s));
+  dock.onTrackerTime(0.0);
+  const auto has_map = [&dock]() {
+    for (const auto& row : dock.availableFrames()) {
+      if (row.name == "map") {
+        return true;
+      }
+    }
+    return false;
+  };
+  ASSERT_TRUE(has_map()) << "precondition: the old log's layer contributed \"map\"";
+
+  dock.removeTopic(map_a);
+  ASSERT_TRUE(dock.addTopic(model_b, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
+  dock.onTrackerTime(0.0);
+  EXPECT_EQ(dock.boundDatasetIdForTest(), 2U);
+  EXPECT_FALSE(has_map()) << "the old log's frame leaked into the new log's frame list";
+  EXPECT_NE(dock.currentFixedFrame(), u"map"_s);
 }
 
 // While the first log still has a render layer in the view, a second log's topic is

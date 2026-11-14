@@ -269,7 +269,8 @@ class Scene3DDockWidget : public SceneDockWidget {
   void resetTransformBindingIfDatasetGone();
   // Before a topic from another dataset is added: when the bound dataset is held
   // ONLY by config (TF) topics, which have no layer row the user could remove,
-  // drop them and unbind so the new topic rebinds the dock to its own dataset.
+  // drop them, forget the frames the dataset contributed, and unbind so the new topic
+  // rebinds the dock to its own dataset.
   // TF trails are kept: they follow frames by name, so they carry over to the new
   // tree. Returns false (binding untouched) while a render layer or pose trail of the bound
   // dataset remains — mixing its frames with another tree would be wrong.

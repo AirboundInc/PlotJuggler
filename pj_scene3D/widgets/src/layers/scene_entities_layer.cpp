@@ -554,6 +554,7 @@ std::vector<MeshRenderPass::DrawCall> SceneEntitiesLayer::modelDrawCallsForFrame
         draw.color = glm::vec4(
             overrides_.override_color.r, overrides_.override_color.g, overrides_.override_color.b, draw.color.a);
         draw.use_vertex_color = false;
+        draw.replace_materials = true;
       }
       draws.push_back(std::move(draw));
     }

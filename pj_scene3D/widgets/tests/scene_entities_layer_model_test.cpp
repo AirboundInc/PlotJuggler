@@ -847,6 +847,40 @@ TEST(SceneEntitiesLayerModelTest, FrameCompositionAppliesTfPrimitivePoseAndScale
   EXPECT_NEAR(draws.front().color.a, 102.0f / 255.0f, 1e-6f);
 }
 
+// The viewer-side recolor replaces the materials like a message override_color does,
+// so textured parts take the chosen color too instead of tinting their texture.
+TEST(SceneEntitiesLayerModelTest, ViewerColorOverrideReplacesModelMaterials) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({makeEntity("car", 10, "base_link")}));
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(ctx.tf_buffer->setTransform(
+      pj::scene3d::StampedTransform{
+          .stamp = PJ::fromRaw(0),
+          .parent_frame = "world",
+          .child_frame = "base_link",
+          .transform = pj::scene3d::Transform({0.0, 0.0, 0.0}, {1.0, 0.0, 0.0, 0.0}),
+      }));
+  ASSERT_TRUE(layer.attach(ctx));
+  layer.setColorOverrideEnabled(true);
+  layer.setOverrideColor(QColor(0, 255, 0));
+  layer.setTrackerTime(PJ::fromRaw(10));
+
+  const std::string fixed_frame = "world";
+  const pj::scene3d::FrameContext frame_ctx{*ctx.tf_buffer, fixed_frame, PJ::fromRaw(10)};
+  const auto draws = layer.modelDrawCallsForFrame(frame_ctx);
+
+  ASSERT_EQ(draws.size(), 1u);
+  EXPECT_FALSE(draws.front().use_vertex_color);
+  EXPECT_TRUE(draws.front().replace_materials);
+  EXPECT_NEAR(draws.front().color.r, 0.0f, 1e-6f);
+  EXPECT_NEAR(draws.front().color.g, 1.0f, 1e-6f);
+  EXPECT_NEAR(draws.front().color.b, 0.0f, 1e-6f);
+}
+
 // H.8: a DATA-SUPPLIED http(s) model URL must not be fetched without the
 // explicit opt-in (QSettings pj_scene3d/allow_remote_model_fetch, default off):
 // opening a crafted dataset is an SSRF / beacon vector. The block must be
