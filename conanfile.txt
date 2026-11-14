@@ -31,6 +31,9 @@ fast_float/8.2.10
 libarchive/3.8.7
 libjpeg-turbo/3.2.0
 libpng/1.6.58
+# The Airbound APBin plugin (plugins/data_load_apbin) downloads 3D terrain tiles with
+# libcurl (TLS via the OpenSSL cpython already pulls in) and decodes them with libpng.
+libcurl/8.22.0
 ffmpeg/9.0.1
 # Crash handler for pj_app: prints a symbolized stack trace (with source
 # file:line) to stderr on SIGSEGV/SIGABRT/etc. The default options select the

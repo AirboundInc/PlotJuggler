@@ -117,8 +117,11 @@ layer, no separate widget.
 ### 3b. Frame trails
 
 A **trail** visualizes the trajectory of a frame's origin across the whole loaded time range as a
-polyline in the current fixed frame, split-colored at the tracker time (past = blue `#1f77b4`,
-future = light blue `#9ecae1`; both per-trail configurable). Thickness is a per-trail parameter
+polyline in the current fixed frame, split-colored at the tracker time (past and future colours
+both per-trail configurable). A new trail's past colour comes from 8 evenly spaced hues of equal lightness and chroma (OKLCH) by a stable
+hash of the frame name, moved on to a colour no other trail in the view uses; the future colour is
+a lighter tint of it. A restored trail keeps its saved colours (default blue `#1f77b4` / light
+blue `#9ecae1`). Thickness is a per-trail parameter
 (1-8 px, default 4, exact at any width — rendered as a screen-space ribbon because core GL caps
 real lines at 1 px), and each half has its own eye toggle to show/hide the past or future segment
 independently. Colors, thickness, and the two visibility flags all persist per-trail. Two sources:
@@ -184,7 +187,7 @@ A **newly-created** widget does not blindly default to the `map`/`world`/`odom`/
 
 **Coordinate convention**: ROS Z-up.
 
-**Implemented**: Orbit, XYOrbit, TopDownOrtho, and Fly (WASD / FPS) — all four selectable via the scene-controls combo. Zoom-to-cursor and Home control are also implemented. **Position-only "follow a frame"** composes with every model via the `ICamera::followShift(world_delta)` seam (Orbit/TopDown shift the focal, Fly the eye, XYOrbit XY-only to stay ground-locked); `SceneViewWidget::applyFollow` drives it per tracker tick using the delta of the followed origin so user orbit/zoom is preserved and enabling causes no jump.
+**Implemented**: Orbit, XYOrbit, TopDownOrtho, and Fly (WASD / FPS) — all four selectable via the scene-controls combo. Zoom-to-cursor and Home control are also implemented. **Position-only "follow a frame"** composes with every model via the `ICamera::followShift(world_delta)` seam (Orbit/TopDown shift the focal, Fly the eye, XYOrbit XY-only to stay ground-locked); `SceneViewWidget::applyFollow` drives it per tracker tick using the delta of the followed origin so user orbit/zoom is preserved and enabling causes no jump. While a frame is followed, drag and wheel orbit and zoom about it wherever the cursor is; without follow they orbit the clicked surface and zoom towards the cursor.
 
 **Still deferred**: Heading/Pose follow modes, bookmark / saved views, animated transitions, `F`-recenter-on-selected-drawable.
 

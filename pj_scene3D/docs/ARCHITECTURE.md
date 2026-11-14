@@ -362,9 +362,13 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   (`setFollowFrame`, "" = off) and applies it each tracker tick in `applyFollow`:
   look up the target's origin in the fixed frame at `render_time_`, and shift the
   camera by the delta against the previous tick's origin (`follow_prev_origin_`).
-  The first tick after enabling / a fixed-frame change / a lookup gap only *seeds*
-  the baseline (no shift), so enabling never jumps and the user's orbit/zoom/pan is
-  preserved (follow only *adds* the target's motion). `followRenderKey(time)` hashes
+  The first tick after enabling / a fixed-frame change only *seeds* the baseline (no
+  shift), so enabling never jumps and the user's orbit/zoom/pan is preserved (follow
+  only *adds* the target's motion). A lookup gap (the target unresolvable at this
+  time, e.g. scrubbed before its first sample) holds the camera but keeps the last
+  known origin, so when the target reappears — possibly far away — the camera catches
+  up by its motion and stays locked on; only a target never resolved yet seeds on
+  appearance. `followRenderKey(time)` hashes
   the followed origin into the dock's `viewRenderKey` so a moving target isn't
   coalesced away by the repaint gate even when the TF overlay is hidden. The UI is
   the "Camera" section's **Follow frame** picker in `Scene3DConfigPanel`, with a
@@ -372,6 +376,52 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   `followShift(target − current focal)`) that snaps the camera onto the target on
   demand. Heading / Pose (rotation-following) modes are future work; the
   `FollowMode` enum already reserves the slot.
+- **Focus on a dropped model.** An interactive `Scene3DDockWidget::addTopic` of a
+  `kSceneEntities` topic, while the dock follows nothing, arms `pending_focus_topic_`.
+  `tryModelFocus` asks the layer for `Scene3DLayer::modelFocus()` — for
+  `SceneEntitiesLayer`, the first entity with a model among the topic's first 16
+  messages, measured in its own frame once its meshes have loaded (an unloaded mesh
+  would measure as the placeholder cube). The loads use the replay's mesh keys, so the
+  real entity reuses them; nothing is folded, so the playhead can be anywhere.
+  `SceneViewWidget::focusOnFrameBounds` then centres the orbit on the box, placing the
+  frame at the playhead or, before its first pose, at `TransformBuffer::getEarliestSample`,
+  with radius 2.5x the box diagonal (and the diagonal as the top-down camera's
+  half-height, which it frames by instead); the dock then follows that frame (seeding at
+  first appearance keeps the camera on it). Retried on the layer's (queued)
+  `repaintRequested` and on TF readiness; dropped when the user picks a follow frame
+  first, the layer goes away, or the model's frame is the fixed frame (a static model:
+  terrain, a map). Layout restore never arms it. Desktop only.
+- **Orbit about the clicked surface.** A left press (no Shift) reads one pixel of the
+  resolved scene depth (`pickSurfaceAt`, `glGetTextureSubImage` on
+  `SceneHdrFbo::resolvedDepthTextureId`, mapped through the chain's own size so
+  supersampling holds) and unprojects it through the camera-relative
+  `last_view_proj_` plus `render_origin_`. A hit makes the drag call
+  `ICamera::rotateAbout(pivot, dx, dy)`: `OrbitCamera` changes the angles exactly as
+  `rotate()` does and moves the focal by the equivalent rigid rotation of the rig about
+  the pivot (elevation step about the horizontal right axis, then azimuth about +Z), so
+  the pivot stays pixel-locked. Before turning it slides the focal along the view axis
+  to the pivot's depth (eye and angles unchanged): a focal left far behind the model by
+  earlier zooms would otherwise stay the centre of later rotations and zooms, and the
+  near plane (which follows the radius) clipped the model before the camera got close.
+  Background (cleared depth) keeps plain `rotate()`.
+  `XYOrbitCamera` ignores the pivot to keep its ground lock; Fly and TopDown use the
+  default (plain rotate).
+- **Zoom towards the surface under the cursor.** The wheel uses the same depth pick:
+  over geometry it calls `ICamera::zoomToSurface(ticks, surface, ...)`, a homothety about
+  the picked point (`OrbitCamera::zoomAbout`, shared with `zoomToCursor`), so a model
+  above the ground is closed in on instead of flown past towards the z=0 / focal-plane
+  anchor `zoomToCursor` uses. An inward tick that would bring the picked point within
+  twice the near plane is undone: the near plane is held up by the scene's extent (depth
+  ratio cap), not just the radius, so the radius floor alone let the model clip. Over
+  background it keeps `zoomToCursor`. `XYOrbitCamera`
+  (ground lock), Fly and TopDown ignore the surface.
+- **A followed frame stays the orbit and zoom centre.** While `follow_frame_` is set,
+  neither the press nor the wheel picks: drags call plain `rotate()` and the wheel calls
+  `zoom()`, both about the focal that `applyFollow` keeps on the frame. A pan offset
+  survives (it moves the focal), and `recenterOnFollowFrame` removes it. Without this,
+  a grazing view of a vehicle near the ground sent cursor zooms to a ground point far
+  beside it, the follow then carried that offset along, and the vehicle drifted out of
+  the orbit centre.
 - **Large-coordinate precision (camera-relative rendering).** Following a frame in a
   UTM/GPS-scale map parks the camera at ~1e5–1e7 m, where float32 keeps only ~0.1–0.6 m
   of resolution and `view × world-geometry` (subtracting the ~1e6 eye from a ~1e6
@@ -493,6 +543,16 @@ topic's first pose) across the whole loaded time range as a
 screen-space ribbon (triangle strip) in the fixed frame, split-colored at the tracker time. See REQUIREMENTS §3b for
 the behavioral contract; the as-built mechanics:
 
+- **Default colours.** `Scene3DDockWidget::addTrailLayer` (interactive only) picks
+  them with `defaultTrailColors(name, taken)`: an FNV-1a hash of the frame name (stable
+  across processes and Qt versions, unlike `qHash`) into 8 hues 45 deg apart in OKLCH at
+  L 0.65 / C 0.11 (the largest chroma all hues reach inside sRGB, so neighbours are equally far
+  apart perceptually; starting at OKLCH red, 29 deg), moved
+  to the next slot not among the other trails' past colours; future = 55 % white tint.
+- **Colours are sRGB, the buffer is linear.** `TrailRenderPass`'s fragment shader
+  linearises `u_color` (`pow(c, 2.2)`) like the other passes, because the HDR scene
+  buffer is linear light and the present re-encodes to sRGB; writing the colour as-is
+  showed every trail much lighter than picked (`ColorIsLinearizedIntoTheLinearSceneBuffer`).
 - **Sampling grid = the chain's own stamps.** `TransformBuffer::chainSampleTimes`
   unions every edge's sample stamps along the connecting path (both chains to
   the common ancestor), so a statically-mounted child (lidar on base_link)
@@ -1063,6 +1123,12 @@ topic's current `SessionManager` parser binding, decodes under `parseLocked`, fo
 validated edges into the dataset's thread-safe `TransformBuffer`, and returns before
 the source payload anchor can expire. This is the normal file and streaming TF path.
 
+The tap only sees parser-routed bytes. A data source or toolbox that pushes
+serialized canonical `FrameTransforms` straight into the `ObjectStore` (no parser,
+`builtin_object_type` metadata) never passes it, so `ingestNewTransforms` /
+`publishTransforms` still drain those parser-less topics from the store while the
+tap is active, and skip only the parser-backed topics the tap already fed.
+
 Progressive file-load flushes emit `datasetTransformsReady` so docks re-read frame
 hierarchies at the current playhead; the flush does not decode TF. Streaming keeps
 the existing `samplesIngested` connection:
@@ -1072,9 +1138,10 @@ the existing `samplesIngested` connection:
   (fired on the UI thread after each retention trim, `live == true` only while
   following a live stream; file load emits `live == false` and is served by the
   loader-driven `datasetTransformsReady` publication described above).
-- On each live tick, `TransformService::ingestNewTransforms` is a no-op while the
-  tap is active. `recomputeOrphanStates(force=false)` observes the buffer revision
-  written by the worker.
+- On each live tick, `TransformService::ingestNewTransforms` drains only parser-less
+  canonical TF topics while the tap is active (parser-backed ones are tap-fed).
+  `recomputeOrphanStates(force=false)` observes the buffer revision written by the
+  worker.
 - `driveVisibleLayersToLiveEdge` then queries each visible layer's `timeRange()`
   for the newest timestamp now in the `ObjectStore` and drives `setTrackerTime`
   on every visible layer (consulting the *layer's* range, not the store's per
@@ -1093,6 +1160,10 @@ tap writes route to a private staging buffer while docks retain the active one.
 `commitReplacingLoad` atomically swaps the staging pointer into the active slot,
 then emits `datasetTransformsReady`; docks rebind their view and TF-backed layers.
 `abortReplacingLoad` drops staging, so rollback performs no ObjectStore reads.
+Canonical (parser-less) TF topics never pass the tap, so while a generation is
+staging `ingestNewTransforms` leaves them alone (draining them would put the reload's
+transforms into the generation on screen); `commitReplacingLoad` resets the drain
+cursors and drains them into the new active buffer before notifying the docks.
 
 `ingestFrameTransformsForDataset` remains an explicit full-store rebuild. Dataset
 merge invalidates the affected buffers and calls it for the anchor because merged

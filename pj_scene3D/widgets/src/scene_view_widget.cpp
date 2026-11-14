@@ -283,9 +283,10 @@ void SceneViewWidget::applyFollow() {
   }
   const auto x = tf_->tryLookupTransform(fixed_frame_, follow_frame_, render_time_);
   if (!x) {
-    // Followed frame not resolvable now: hold the camera and re-seed when it
-    // reappears, so a lookup gap can't teleport the view on resume.
-    follow_seeded_ = false;
+    // Followed frame not resolvable now (e.g. scrubbed before its first sample):
+    // hold the camera but keep the last known origin, so when the frame reappears
+    // the camera catches up by the frame's motion and stays locked on it. A frame
+    // never seen yet still seeds without a jump.
     return;
   }
   const glm::dvec3 origin = x->t;
@@ -323,6 +324,40 @@ void SceneViewWidget::recenterOnFollowFrame() {
   if (!cameraStatesEqual(before, camera_->state())) {
     emit presentationChanged();
   }
+}
+
+bool SceneViewWidget::focusOnFrameBounds(const std::string& frame, const AABB& frame_bounds) {
+  if (tf_ == nullptr || fixed_frame_.empty() || !frame_bounds.valid) {
+    return false;
+  }
+  auto x = tf_->tryLookupTransform(fixed_frame_, frame, render_time_);
+  if (!x) {
+    if (const auto first = tf_->getEarliestSample(frame); first.has_value()) {
+      x = tf_->tryLookupTransform(fixed_frame_, frame, *first);
+    }
+  }
+  if (!x) {
+    return false;
+  }
+  const glm::dvec3 center = *x * ((glm::dvec3(frame_bounds.min) + glm::dvec3(frame_bounds.max)) * 0.5);
+  const float size = glm::length(frame_bounds.max - frame_bounds.min);
+  // A few model sizes away shows the whole model with some context; the floor keeps a
+  // tiny or flat model from putting the eye inside it.
+  constexpr float kRadiusPerSize = 2.5F;
+  constexpr float kMinRadius = 1.0F;
+  const CameraState before = camera_->state();
+  CameraState focused = before;
+  focused.focal = glm::vec3(center);
+  focused.radius = std::max(size * kRadiusPerSize, kMinRadius);
+  // The top-down camera frames by its half-height instead of the radius: the whole
+  // diagonal as the half-height fits the model at any heading and usual aspect.
+  focused.ortho_scale = std::max(size, kMinRadius);
+  camera_->adoptState(focused);
+  update();
+  if (!cameraStatesEqual(before, camera_->state())) {
+    emit presentationChanged();
+  }
+  return true;
 }
 
 uint64_t SceneViewWidget::followRenderKey(PJ::Timepoint time) const {
@@ -988,6 +1023,11 @@ void SceneViewWidget::mousePressEvent(QMouseEvent* event) {
   last_mouse_pos_ = event->position().toPoint();
   active_button_ = event->button();
   camera_gesture_changed_ = false;
+  orbit_pivot_.reset();
+  // While following a frame the orbit stays on it, so only a free camera orbits the clicked point.
+  if (active_button_ == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) == 0 && follow_frame_.empty()) {
+    orbit_pivot_ = pickSurfaceAt(event->position());
+  }
   // Hide any hover label for the duration of a camera gesture; it re-appears on
   // the next button-free move (the hit-test below only runs with no button).
   if (hovered_frame_.has_value()) {
@@ -1037,7 +1077,11 @@ void SceneViewWidget::mouseMoveEvent(QMouseEvent* event) {
   bool handled = true;
 
   if (active_button_ == Qt::LeftButton && !shift) {
-    camera_->rotate(dx, dy);
+    if (orbit_pivot_.has_value()) {
+      camera_->rotateAbout(*orbit_pivot_, dx, dy);
+    } else {
+      camera_->rotate(dx, dy);
+    }
   } else if (active_button_ == Qt::MiddleButton || (active_button_ == Qt::LeftButton && shift)) {
     camera_->pan(dx, dy);
   } else if (active_button_ == Qt::RightButton) {
@@ -1060,6 +1104,42 @@ void SceneViewWidget::leaveEvent(QEvent* event) {
     update();
   }
   QOpenGLWidget::leaveEvent(event);
+}
+
+std::optional<glm::vec3> SceneViewWidget::pickSurfaceAt(const QPointF& pos_logical) {
+  const QSize fbo = scene_fbo_.size();
+  if (!scene_fbo_.ready() || fbo.isEmpty() || width() <= 0 || height() <= 0) {
+    return std::nullopt;
+  }
+  // The scene chain may be supersampled, so map through its own size, not the DPR.
+  const int px = std::clamp(
+      static_cast<int>(pos_logical.x() * fbo.width() / width()), 0, fbo.width() - 1);
+  const int py = std::clamp(
+      static_cast<int>((height() - pos_logical.y()) * fbo.height() / height()), 0, fbo.height() - 1);
+  makeCurrent();
+  float depth = 1.0f;
+  if (auto* funcs = QOpenGLVersionFunctionsFactory::get<QOpenGLFunctions_4_5_Core>(context()); funcs != nullptr) {
+    funcs->glGetTextureSubImage(
+        scene_fbo_.resolvedDepthTextureId(), 0, px, py, 0, 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(depth),
+        &depth);
+  }
+  doneCurrent();
+  if (!(depth < 1.0f)) {
+    return std::nullopt;  // cleared depth: nothing drawn here
+  }
+  const glm::vec4 ndc{
+      (static_cast<float>(px) + 0.5f) / static_cast<float>(fbo.width()) * 2.0f - 1.0f,
+      (static_cast<float>(py) + 0.5f) / static_cast<float>(fbo.height()) * 2.0f - 1.0f, depth * 2.0f - 1.0f, 1.0f};
+  const glm::vec4 rel = glm::inverse(last_view_proj_) * ndc;
+  if (std::abs(rel.w) < 1e-12f) {
+    return std::nullopt;
+  }
+  // last_view_proj_ is camera-relative: add the render origin back in double.
+  const glm::dvec3 world = glm::dvec3(glm::vec3(rel) / rel.w) + render_origin_;
+  if (!std::isfinite(world.x) || !std::isfinite(world.y) || !std::isfinite(world.z)) {
+    return std::nullopt;
+  }
+  return glm::vec3(world);
 }
 
 std::optional<std::string> SceneViewWidget::pickFrameAt(const QPointF& pos_logical) const {
@@ -1121,7 +1201,18 @@ void SceneViewWidget::wheelEvent(QWheelEvent* event) {
   const float ticks = static_cast<float>(event->angleDelta().y()) / 120.0f;
   const QPointF pos = event->position();
   const CameraState before = camera_->state();
-  camera_->zoomToCursor(ticks, glm::vec2{static_cast<float>(pos.x()), static_cast<float>(pos.y())}, width(), height());
+  const glm::vec2 cursor{static_cast<float>(pos.x()), static_cast<float>(pos.y())};
+  // While following a frame, zoom towards it (the look-at point) wherever the cursor is.
+  // Otherwise, over geometry, zoom towards the surface under the cursor rather than the ground
+  // or focal plane behind it, so the camera closes in on (and never flies past) a model above
+  // the ground.
+  if (!follow_frame_.empty()) {
+    camera_->zoom(ticks);
+  } else if (const std::optional<glm::vec3> surface = pickSurfaceAt(pos)) {
+    camera_->zoomToSurface(ticks, *surface, cursor, width(), height());
+  } else {
+    camera_->zoomToCursor(ticks, cursor, width(), height());
+  }
   update();
   if (!cameraStatesEqual(before, camera_->state())) {
     emit presentationChanged();

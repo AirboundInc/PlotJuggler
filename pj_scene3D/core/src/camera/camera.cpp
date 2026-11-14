@@ -133,6 +133,42 @@ void OrbitCamera::rotate(float dx_pixels, float dy_pixels) {
   state_.elevation = std::clamp(state_.elevation + dy_pixels / kPixelsPerRadian, -kPolarLimit, kPolarLimit);
 }
 
+void OrbitCamera::rotateAbout(const glm::vec3& pivot, float dx_pixels, float dy_pixels) {
+  const float azimuth_before = state_.azimuth;
+  const glm::vec3 dir_before = sphericalDir(state_.azimuth, state_.elevation);
+  // Slide the focal along the view axis to the pivot's depth (eye and angles unchanged, so
+  // nothing moves on screen). Otherwise a focal left far behind the model by earlier zooms
+  // stays the centre of every later rotation and zoom, and the near plane, which follows
+  // the radius, clips the model before the camera gets close. Offsets only: no difference
+  // of large absolute positions.
+  const float depth = glm::dot(state_.focal - pivot, dir_before) + state_.radius;  // pivot depth from the eye
+  float lo = 0.0f;
+  float hi = 0.0f;
+  radiusLimits(scene_bounds_, state_.focal, state_.radius, lo, hi);
+  if (depth > lo) {
+    const float radius = std::min(depth, hi);
+    state_.focal += (state_.radius - radius) * dir_before;
+    state_.radius = radius;
+  }
+  rotate(dx_pixels, dy_pixels);
+  // The same change of view angles as a rigid rotation of the camera rig: first the
+  // elevation step about the camera's horizontal right axis, then the azimuth step
+  // about world +Z. Applied to the focal relative to the pivot (both small local
+  // vectors, so no large-coordinate cancellation); the eye follows from the angles.
+  const glm::vec3 dir_pitched = sphericalDir(azimuth_before, state_.elevation);
+  const glm::vec3 dir_after = sphericalDir(state_.azimuth, state_.elevation);
+  glm::mat4 rig{1.0f};
+  const float yaw = std::atan2(dir_after.y, dir_after.x) - std::atan2(dir_pitched.y, dir_pitched.x);
+  rig = glm::rotate(rig, yaw, glm::vec3{0.0f, 0.0f, 1.0f});
+  const glm::vec3 pitch_axis = glm::cross(dir_before, dir_pitched);
+  const float pitch_sin = glm::length(pitch_axis);
+  if (pitch_sin > 1e-7f) {
+    const float pitch = std::atan2(pitch_sin, glm::dot(dir_before, dir_pitched));
+    rig = glm::rotate(rig, pitch, pitch_axis / pitch_sin);
+  }
+  state_.focal = pivot + glm::vec3(rig * glm::vec4(state_.focal - pivot, 0.0f));
+}
+
 void OrbitCamera::pan(float dx_pixels, float dy_pixels) {
   const glm::mat4 view = viewMatrix();
   const glm::vec3 right{view[0][0], view[1][0], view[2][0]};
@@ -190,7 +226,28 @@ void OrbitCamera::zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int view
     zoom(scroll_ticks);
     return;
   }
+  zoomAbout(scroll_ticks, target);
+}
 
+void OrbitCamera::zoomToSurface(
+    float scroll_ticks, const glm::vec3& surface, glm::vec2 /*cursor_px*/, int /*viewport_w*/, int /*viewport_h*/) {
+  const CameraState before = state_;
+  zoomAbout(scroll_ticks, surface);
+  if (scroll_ticks <= 0.0f) {
+    return;
+  }
+  // The radius floor alone lets the eye pass the surface's near plane, which the scene's
+  // extent can hold well above it: stop while the surface is still clearly in front.
+  constexpr float kNearMargin = 2.0f;
+  float near_plane = 0.0f;
+  float far_plane = 0.0f;
+  adaptiveNearFar(state_.radius, sceneReach(scene_bounds_, state_.focal), near_plane, far_plane);
+  if (glm::length(position() - surface) < kNearMargin * near_plane) {
+    state_ = before;
+  }
+}
+
+void OrbitCamera::zoomAbout(float scroll_ticks, const glm::vec3& target) {
   // Homothety about the cursor point: scaling eye AND focal toward `target` by the
   // same factor is a uniform scaling, so it CANNOT rotate the eye→focal direction —
   // azimuth/elevation are mathematically invariant and the hovered point stays

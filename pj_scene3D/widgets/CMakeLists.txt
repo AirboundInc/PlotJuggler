@@ -519,6 +519,12 @@ if(PJ_BUILD_TESTS)
     tests/scene3d_dock_depth_gate_test.cpp
   )
 
+  # A parser-less canonical SceneEntities topic (a data source pushing serialized
+  # objects) dropped on a fresh 3D view becomes a SceneEntities layer.
+  list(APPEND PJ_SCENE3D_WIDGET_TESTS
+    tests/scene3d_dock_canonical_entities_test.cpp
+  )
+
   # PosesInFrameLayer: tracker-time decode -> triad expansion, scrub coalescing,
   # size/opacity re-expansion, empty/orphan edges, the per-use parseLocked rebind
   # guard, and the copy/paste/apply-to-family param round-trip (serializeLayerParams).
@@ -636,6 +642,19 @@ if(PJ_BUILD_TESTS)
   )
   target_compile_options(shadow_persistence_gl_test PRIVATE ${PJ_WARNING_FLAGS})
   add_test(NAME shadow_persistence_gl_test COMMAND shadow_persistence_gl_test)
+
+  # Depth pick behind orbit-about-surface and wheel zoom towards it, on a real
+  # SceneViewWidget. Same custom main and skip rules as shadow_persistence_gl_test.
+  add_executable(scene_view_pick_gl_test
+    tests/scene_view_pick_gl_test.cpp
+  )
+  target_link_libraries(scene_view_pick_gl_test PRIVATE
+    pj_scene3d_widgets
+    GTest::gtest
+    pj_gpu_test_gate
+  )
+  target_compile_options(scene_view_pick_gl_test PRIVATE ${PJ_WARNING_FLAGS})
+  add_test(NAME scene_view_pick_gl_test COMMAND scene_view_pick_gl_test)
 
   # Keep the robot-model executable separate: it needs both the fixture-path
   # definition and test hooks, unlike the other fixture sources.

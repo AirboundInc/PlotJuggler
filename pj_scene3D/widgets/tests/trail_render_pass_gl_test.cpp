@@ -15,8 +15,10 @@
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
+#include <QOpenGLFramebufferObjectFormat>
 #include <QOpenGLFunctions>
 #include <QSurfaceFormat>
+#include <cmath>
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -148,6 +150,44 @@ TEST_F(TrailRenderPassGlTest, SplitColorsLandInTheFramebuffer) {
   // wide). Use loose floors — rasterization details vary across drivers.
   EXPECT_GT(past_pixels, 10) << "past-color segment missing from the framebuffer";
   EXPECT_GT(future_pixels, 10) << "future-color segment missing from the framebuffer";
+}
+
+// The scene renders into a linear-light HDR buffer that the present re-encodes to sRGB, so the
+// trail's display (sRGB) colour must be linearised on write like every other pass does. Without
+// it a mid colour is stored as-is and the re-encode shows it much lighter (0.5 -> ~0.73).
+TEST_F(TrailRenderPassGlTest, ColorIsLinearizedIntoTheLinearSceneBuffer) {
+  QOpenGLFramebufferObjectFormat format;
+  format.setInternalTextureFormat(GL_RGBA16F);
+  QOpenGLFramebufferObject fbo(QSize(64, 64), format);
+  ASSERT_TRUE(fbo.bind());
+  auto* functions = context_.functions();
+  functions->glViewport(0, 0, 64, 64);
+  functions->glClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+  functions->glClear(GL_COLOR_BUFFER_BIT);
+
+  TrailRenderPass pass;
+  pass.initializeGL();
+  pass.setPoints({glm::dvec3(-0.9, 0.0, 0.0), glm::dvec3(0.9, 0.0, 0.0)});
+  ViewParams view_params;
+  view_params.view = glm::mat4(1.0F);
+  view_params.proj = glm::mat4(1.0F);
+  view_params.device_width_px = 64;
+  view_params.device_height_px = 64;
+  const glm::vec3 grey(0.5F);
+  pass.render(view_params, glm::dvec3(0.0), 2, grey, grey, 4.0F, true, true);
+  ASSERT_EQ(glError(), static_cast<GLenum>(GL_NO_ERROR));
+
+  std::vector<float> pixels(64 * 64 * 4);
+  functions->glReadPixels(0, 0, 64, 64, GL_RGBA, GL_FLOAT, pixels.data());
+  float drawn = -1.0F;
+  for (std::size_t i = 0; i < pixels.size(); i += 4) {
+    if (pixels[i + 3] > 0.99F) {  // a fully covered ribbon pixel
+      drawn = pixels[i];
+      break;
+    }
+  }
+  ASSERT_GE(drawn, 0.0F) << "the ribbon drew nothing";
+  EXPECT_NEAR(drawn, std::pow(0.5F, 2.2F), 0.01F);
 }
 
 }  // namespace

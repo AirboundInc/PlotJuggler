@@ -10,7 +10,15 @@
 // Output, one line per series, sorted by name:
 //   SERIES <topic>/<field> count=<n> t0=<ns> t1=<ns> hash=<fnv1a of (ns, value bits)>
 // Points are stable-sorted by time before hashing (PJ3's PlotData keeps series time-sorted).
+// Object topics (pj.source_object_write.v1) print one OBJECT summary line each; FrameTransforms
+// topics also print a TFEDGES line (transforms per frame edge, entry order) and TF lines for a
+// few decoded samples.
+//
+// APBIN_DUMP_TIMINGS=1 also prints to stderr, with the seconds since the load started, every
+// progress start/update, host message and object push, to see where a load spends its time.
 
+#include <pj_base/builtin/frame_transforms_codec.hpp>
+#include <pj_base/builtin/scene_entities_codec.hpp>
 #include <pj_base/data_source_protocol.h>
 #include <pj_base/plugin_data_api.h>
 
@@ -19,7 +27,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -57,6 +67,22 @@ struct Topic {
   std::vector<Field> fields;
   std::map<std::string, uint32_t, std::less<>> field_ids;
 };
+
+struct ObjectTopic {
+  std::string name;
+  std::string metadata;
+  std::vector<std::pair<int64_t, std::vector<uint8_t>>> entries;
+};
+
+// Prints `what` to stderr with the seconds since the first call, when APBIN_DUMP_TIMINGS is set.
+void traceTiming(const std::string& what) {
+  static const bool enabled = std::getenv("APBIN_DUMP_TIMINGS") != nullptr;
+  static const auto start = std::chrono::steady_clock::now();
+  if (enabled) {
+    const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::fprintf(stderr, "[%8.3f s] %s\n", s, what.c_str());
+  }
+}
 
 double toDouble(const PJ_scalar_value_t& v) {
   switch (v.type) {
@@ -96,6 +122,13 @@ class FakeHost {
     runtime_vt_.request_stop = &FakeHost::requestStop;
     runtime_vt_.set_dataset_metadata = &FakeHost::setDatasetMetadata;
 
+    object_vt_.abi_version = PJ_ABI_VERSION;
+    object_vt_.struct_size = sizeof(object_vt_);
+    object_vt_.register_topic = &FakeHost::registerObjectTopic;
+    object_vt_.push_owned = &FakeHost::pushOwned;
+    object_vt_.push_lazy = &FakeHost::pushLazy;
+    object_vt_.set_retention_budget = &FakeHost::setRetentionBudget;
+
     registry_vt_.protocol_version = 1;
     registry_vt_.struct_size = sizeof(registry_vt_);
     registry_vt_.get_service = &FakeHost::getService;
@@ -105,10 +138,13 @@ class FakeHost {
     return {this, &registry_vt_};
   }
 
-  std::vector<Topic> topics;
+  // A deque: Topic holds std::maps, which MSVC copies instead of moving when a vector grows, so a
+  // vector re-copied every stored point each time it grew and skewed the timings.
+  std::deque<Topic> topics;
   std::map<std::string, uint32_t, std::less<>> topic_ids;
   std::vector<std::string> messages;
   std::string metadata;
+  std::vector<ObjectTopic> object_topics;
 
  private:
   static FakeHost* self(void* ctx) {
@@ -122,6 +158,10 @@ class FakeHost {
     }
     if (sv(name) == "pj.runtime.v1") {
       *out = {ctx, &self(ctx)->runtime_vt_};
+      return true;
+    }
+    if (sv(name) == "pj.source_object_write.v1") {
+      *out = {ctx, &self(ctx)->object_vt_};
       return true;
     }
     setError(err, "service not provided by apbin_dump: " + std::string(sv(name)));
@@ -209,14 +249,19 @@ class FakeHost {
 
   static void reportMessage(void* ctx, PJ_data_source_message_level_t level, PJ_string_view_t message) noexcept {
     self(ctx)->messages.push_back("[" + std::to_string(static_cast<int>(level)) + "] " + std::string(sv(message)));
+    traceTiming("message " + std::string(sv(message)));
   }
-  static bool progressStart(void*, PJ_string_view_t, uint64_t, bool, PJ_error_t*) noexcept {
+  static bool progressStart(void*, PJ_string_view_t label, uint64_t total, bool, PJ_error_t*) noexcept {
+    traceTiming("progress start '" + std::string(sv(label)) + "' total=" + std::to_string(total));
     return true;
   }
-  static bool progressUpdate(void*, uint64_t) noexcept {
+  static bool progressUpdate(void*, uint64_t current) noexcept {
+    traceTiming("progress " + std::to_string(current));
     return true;
   }
-  static void progressFinish(void*) noexcept {}
+  static void progressFinish(void*) noexcept {
+    traceTiming("progress finish");
+  }
   static bool isStopRequested(void*) noexcept {
     return false;
   }
@@ -227,6 +272,43 @@ class FakeHost {
     return true;
   }
 
+  static bool registerObjectTopic(
+      void* ctx, PJ_string_view_t name, PJ_string_view_t metadata, PJ_object_topic_handle_t* out,
+      PJ_error_t* err) noexcept {
+    auto* h = self(ctx);
+    for (const auto& topic : h->object_topics) {
+      if (topic.name == sv(name)) {
+        setError(err, "object topic already registered: " + topic.name);
+        return false;
+      }
+    }
+    h->object_topics.push_back({std::string(sv(name)), std::string(sv(metadata)), {}});
+    out->id = static_cast<uint32_t>(h->object_topics.size());  // 0 is the invalid handle
+    return true;
+  }
+  static bool pushOwned(
+      void* ctx, PJ_object_topic_handle_t topic, int64_t ts, const uint8_t* data, uint64_t size,
+      PJ_error_t* err) noexcept {
+    auto* h = self(ctx);
+    if (topic.id == 0 || topic.id > h->object_topics.size()) {
+      setError(err, "bad object topic handle");
+      return false;
+    }
+    h->object_topics[topic.id - 1].entries.emplace_back(ts, std::vector<uint8_t>(data, data + size));
+    if (h->object_topics[topic.id - 1].entries.size() == 1) {
+      traceTiming("first object on " + h->object_topics[topic.id - 1].name + " (" + std::to_string(size) + " bytes)");
+    }
+    return true;
+  }
+  // A rejected push leaves fetch_ctx with the caller, as the production host does.
+  static bool pushLazy(
+      void*, PJ_object_topic_handle_t, int64_t, PJ_lazy_fetch_fn_t, void*, void (*)(void*), PJ_error_t* err) noexcept {
+    setError(err, "apbin_dump does not support lazy object entries");
+    return false;
+  }
+  static void setRetentionBudget(void*, PJ_object_topic_handle_t, int64_t, uint64_t) noexcept {}
+
+  PJ_object_write_host_vtable_t object_vt_{};
   PJ_source_write_host_vtable_t write_vt_{};
   PJ_data_source_runtime_host_vtable_t runtime_vt_{};
   PJ_service_registry_vtable_t registry_vt_{};
@@ -306,8 +388,10 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  traceTiming("start");
   const auto start = std::chrono::steady_clock::now();
   const bool ok = vt->start(ctx, &err);
+  traceTiming("start returned");
   const auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   vt->destroy(ctx);
@@ -332,6 +416,86 @@ int main(int argc, char** argv) {
   }
   for (const auto& [name, field] : numeric) {
     printSeries(name, field->points);
+  }
+  for (const auto& object : host.object_topics) {
+    const long long t0 = object.entries.empty() ? 0 : object.entries.front().first;
+    const long long t1 = object.entries.empty() ? 0 : object.entries.back().first;
+    std::printf("OBJECT %s count=%zu t0=%lld t1=%lld meta=%s\n", object.name.c_str(), object.entries.size(), t0, t1,
+                object.metadata.c_str());
+    if (object.metadata.find("kSceneEntities") != std::string::npos) {
+      for (const auto& [ts, bytes] : object.entries) {
+        const auto decoded = PJ::deserializeSceneEntities(bytes.data(), bytes.size());
+        if (!decoded) {
+          std::printf("MODEL %lld <decode failed>\n", static_cast<long long>(ts));
+          continue;
+        }
+        for (const auto& entity : decoded->entities) {
+          std::printf("MODEL %lld id=%s frame=%s locked=%d lifetime=%lld", static_cast<long long>(ts),
+                      entity.id.c_str(), entity.frame_id.c_str(), entity.frame_locked ? 1 : 0,
+                      static_cast<long long>(entity.lifetime_ns));
+          for (const auto& kv : entity.metadata) {
+            std::printf(" %s=%s", kv.key.c_str(), kv.value.c_str());
+          }
+          for (const auto& model : entity.models) {
+            std::printf(" model(%s, %zu bytes, scale=%.3f, pos=(%.3f, %.3f, %.3f), q=(%.3f, %.3f, %.3f, %.3f))",
+                        model.media_type.c_str(), model.data.size(), model.scale.x, model.pose.position.x,
+                        model.pose.position.y, model.pose.position.z, model.pose.orientation.x,
+                        model.pose.orientation.y, model.pose.orientation.z, model.pose.orientation.w);
+            // APBIN_DUMP_MODELS_DIR: also write each inline model to <dir>/<entity id>.glb for inspection.
+            if (const char* dir = std::getenv("APBIN_DUMP_MODELS_DIR"); dir != nullptr && *dir != '\0' &&
+                                                                         !model.data.empty()) {
+              const std::string path = std::string(dir) + "/" + entity.id + ".glb";
+              if (std::FILE* file = std::fopen(path.c_str(), "wb")) {
+                std::fwrite(model.data.data(), 1, model.data.size(), file);
+                std::fclose(file);
+              }
+            }
+          }
+          std::printf("\n");
+        }
+      }
+      continue;
+    }
+    if (object.metadata.find("kFrameTransforms") == std::string::npos || object.entries.empty()) {
+      continue;
+    }
+    // Transforms per parent->child edge, and whether entries arrive in time order.
+    std::map<std::string, size_t> per_edge;
+    bool ordered = true;
+    for (size_t i = 0; i < object.entries.size(); ++i) {
+      const auto& [ts, bytes] = object.entries[i];
+      ordered = ordered && (i == 0 || object.entries[i - 1].first <= ts);
+      if (const auto decoded = PJ::deserializeFrameTransforms(bytes.data(), bytes.size())) {
+        for (const auto& tf : decoded->transforms) {
+          ++per_edge[tf.parent_frame_id + "->" + tf.child_frame_id];
+        }
+      }
+    }
+    std::printf("TFEDGES %s ordered=%s", object.name.c_str(), ordered ? "yes" : "NO");
+    for (const auto& [edge, count] : per_edge) {
+      std::printf(" %s=%zu", edge.c_str(), count);
+    }
+    std::printf("\n");
+
+    // A few evenly spaced samples, decoded, with the heading implied by the rotation
+    // (ENU yaw of the body x axis, converted back to a compass bearing).
+    const size_t n = object.entries.size();
+    for (size_t k = 0; k < 5; ++k) {
+      const auto& [ts, bytes] = object.entries[k * (n - 1) / 4];
+      const auto decoded = PJ::deserializeFrameTransforms(bytes.data(), bytes.size());
+      if (!decoded || decoded->transforms.empty()) {
+        std::printf("TF %lld <decode failed>\n", static_cast<long long>(ts));
+        continue;
+      }
+      const auto& tf = decoded->transforms.front();
+      const auto& q = tf.rotation;
+      const double enu_yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      double bearing = 90.0 - enu_yaw * 180.0 / 3.14159265358979323846;
+      bearing = std::fmod(bearing + 360.0, 360.0);
+      std::printf("TF %lld %s->%s xyz=(%.2f, %.2f, %.2f) q=(%.4f, %.4f, %.4f, %.4f) bearing=%.1f\n",
+                  static_cast<long long>(ts), tf.parent_frame_id.c_str(), tf.child_frame_id.c_str(),
+                  tf.translation.x, tf.translation.y, tf.translation.z, q.x, q.y, q.z, q.w, bearing);
+    }
   }
   for (const auto& message : host.messages) {
     std::printf("REPORT %s\n", message.c_str());

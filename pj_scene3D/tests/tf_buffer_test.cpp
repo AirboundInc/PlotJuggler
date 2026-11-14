@@ -555,5 +555,15 @@ TEST(TransformBufferChainSampleTimes, DisconnectedUnknownOrIdenticalIsEmpty) {
   EXPECT_TRUE(stamps.empty());
 }
 
+TEST(TransformBufferTest, EarliestAndLatestSampleOfAFrame) {
+  TransformBuffer buffer;
+  EXPECT_FALSE(buffer.getEarliestSample("A").has_value());
+  (void)buffer.setTransform(makeStamped("world", "A", tp(30ns), makeTranslation(1.0)));
+  (void)buffer.setTransform(makeStamped("world", "A", tp(10ns), makeTranslation(2.0)));
+  (void)buffer.setTransform(makeStamped("world", "A", tp(20ns), makeTranslation(3.0)));
+  EXPECT_EQ(buffer.getEarliestSample("A"), tp(10ns));
+  EXPECT_EQ(buffer.getLatestSample("A"), tp(30ns));
+}
+
 }  // namespace
 }  // namespace PJ

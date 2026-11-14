@@ -1,7 +1,7 @@
 {
   "id": "airbound-apbin-loader",
   "name": "ArduPilot Bin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Data loader for ArduPilot DataFlash (.bin) logs. Ported from the Airbound PlotJuggler 3 fork of ArduPilot/plotjuggler-apbin-plugins.",
   "author": "Pierre Kancir, Jonas Withelm, Airbound",
   "publisher": "Airbound",

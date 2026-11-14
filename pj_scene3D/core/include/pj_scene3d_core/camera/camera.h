@@ -249,12 +249,28 @@ class ICamera {
   virtual void followShift(const glm::vec3& world_delta) = 0;
 
   virtual void rotate(float dx_pixels, float dy_pixels) = 0;
+  // rotate(), but turning the whole camera about `pivot` (a world point, e.g. the
+  // surface under the cursor) instead of about the camera's own anchor, so the pivot
+  // stays put on screen. The orbit camera also moves its focal to the pivot's depth, so
+  // later rotations and zooms centre on what was clicked. Models without a free orbit
+  // pivot ignore `pivot`.
+  virtual void rotateAbout(const glm::vec3& /*pivot*/, float dx_pixels, float dy_pixels) {
+    rotate(dx_pixels, dy_pixels);
+  }
   virtual void pan(float dx_pixels, float dy_pixels) = 0;
   virtual void zoom(float scroll_ticks) = 0;
   // Zoom keeping the world point under the cursor fixed. cursor_px is in Qt
   // widget pixels (origin top-left). Falls back to center-of-view zoom() when no
   // ground/focal-plane hit exists.
   virtual void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) = 0;
+  // zoomToCursor() when the cursor is over geometry: `surface` is the world point under it
+  // (from the depth buffer), which stays pixel-locked and is what the zoom closes in on,
+  // instead of the ground or focal plane behind it, stopping before `surface` would reach
+  // the near plane. Models without a free orbit pivot ignore `surface`.
+  virtual void zoomToSurface(
+      float scroll_ticks, const glm::vec3& /*surface*/, glm::vec2 cursor_px, int viewport_w, int viewport_h) {
+    zoomToCursor(scroll_ticks, cursor_px, viewport_w, viewport_h);
+  }
 
   virtual void reset() = 0;  ///< Restore this model's default view.
   virtual void fitToBoundingBox(const AABB& bounds) = 0;
@@ -279,9 +295,12 @@ class OrbitCamera : public ICamera {
 
   void followShift(const glm::vec3& world_delta) override;  // focal += delta
   void rotate(float dx_pixels, float dy_pixels) override;
+  void rotateAbout(const glm::vec3& pivot, float dx_pixels, float dy_pixels) override;
   void pan(float dx_pixels, float dy_pixels) override;
   void zoom(float scroll_ticks) override;
   void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) override;
+  void zoomToSurface(
+      float scroll_ticks, const glm::vec3& surface, glm::vec2 cursor_px, int viewport_w, int viewport_h) override;
 
   void reset() override;
   void fitToBoundingBox(const AABB& bounds) override;
@@ -292,6 +311,9 @@ class OrbitCamera : public ICamera {
   void adoptState(const CameraState& state) override;
 
  protected:
+  // Zoom by `scroll_ticks` as a homothety about the world point `target`, which stays
+  // pixel-locked; the view angles are untouched.
+  void zoomAbout(float scroll_ticks, const glm::vec3& target);
   // Set spherical state so position() == eye and the camera looks at `focal`
   // (re-derives radius/azimuth/elevation; clamps radius/elevation but keeps the
   // eye fixed). Shared by zoomToCursor and the XYOrbit ground re-lock.
@@ -309,6 +331,16 @@ class XYOrbitCamera final : public OrbitCamera {
   // Ground-locked override: shift focal in XY only (drop world_delta.z) so the
   // pivot never floats off the floor while following a frame with vertical motion.
   void followShift(const glm::vec3& world_delta) override;
+  // Orbits its ground pivot as rotate() does: turning about an off-floor point would
+  // lift the pivot off z=0.
+  void rotateAbout(const glm::vec3& /*pivot*/, float dx_pixels, float dy_pixels) override {
+    rotate(dx_pixels, dy_pixels);
+  }
+  // Same reason: zooming into an off-floor point would lift the pivot off z=0.
+  void zoomToSurface(
+      float scroll_ticks, const glm::vec3& /*surface*/, glm::vec2 cursor_px, int viewport_w, int viewport_h) override {
+    zoomToCursor(scroll_ticks, cursor_px, viewport_w, viewport_h);
+  }
   void pan(float dx_pixels, float dy_pixels) override;
   void zoomToCursor(float scroll_ticks, glm::vec2 cursor_px, int viewport_w, int viewport_h) override;
   // Re-lock the pivot to the floor (z=0) after adopting an arbitrary pose, keeping

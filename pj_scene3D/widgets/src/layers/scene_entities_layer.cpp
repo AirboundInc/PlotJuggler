@@ -32,6 +32,7 @@
 #include "pj_scene3d_core/scene_entities_decode.h"
 #include "pj_scene3d_core/scene_entities_model_state.h"
 #include "pj_scene3d_widgets/parse_locked.h"
+#include "pj_scene3d_widgets/resolve_object.h"
 #include "pj_widgets/ColorPickerWidget.h"
 #include "pj_widgets/DoubleScrubber.h"
 #include "pj_widgets/FrameworkTokens.h"
@@ -247,8 +248,12 @@ bool SceneEntitiesLayer::attach(const PJ::SceneLayerContext& ctx) {
     return false;
   }
   ctx_ = scene3d_ctx;
-  if (!ctx_.session->parserBindingForObjectTopic(topic_id_)) {
-    qCWarning(lcSceneEntitiesLayer) << "attach: no parser for topic_id=" << topic_id_.id;
+  // Accept a parser-backed topic OR a parser-less canonical SceneEntities topic
+  // (a data source/toolbox that pushed serialized canonical entities, decoded
+  // host-side by resolveObject()).
+  if (!ctx_.session->parserBindingForObjectTopic(topic_id_) &&
+      !hasCanonical3DCodec(PJ::sdk::BuiltinObjectType::kSceneEntities)) {
+    qCWarning(lcSceneEntitiesLayer) << "attach: no parser and no canonical codec for topic_id=" << topic_id_.id;
     return false;
   }
   // A dataset reload (SessionManager::replaceDataset) re-attaches without a
@@ -288,6 +293,8 @@ void SceneEntitiesLayer::resetReplayState() {
   entities_.clear();
   entity_expiry_anchor_ns_.clear();
   model_frames_.clear();
+  focus_entity_.reset();
+  focus_scanned_entries_ = 0;
   state_built_at_.reset();
   applied_uid_high_ = {};
   snapshot_cache_.clear();
@@ -360,6 +367,78 @@ void SceneEntitiesLayer::renderShadowCasters(const glm::mat4& light_view_proj, c
   mesh_pass_->renderDepthOnly(light_view_proj, modelDrawCallsForFrame(frame_ctx));
 }
 
+std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
+  if (ctx_.session == nullptr) {
+    return std::nullopt;
+  }
+  if (!focus_entity_.has_value()) {
+    // A model topic carries its model in its first message or close to it; the cap keeps
+    // a markers-only topic from being decoded end to end on every retry.
+    constexpr std::size_t kMaxScannedEntries = 16;
+    PJ::ObjectStore& store = ctx_.session->objectStore();
+    const std::size_t available = std::min(store.entryCount(topic_id_), kMaxScannedEntries);
+    if (available <= focus_scanned_entries_) {
+      return std::nullopt;
+    }
+    const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
+    for (std::size_t index = focus_scanned_entries_; index < available && !focus_entity_.has_value(); ++index) {
+      const auto entry = store.at(topic_id_, index);
+      if (!entry.has_value() || entry->payload.bytes.empty()) {
+        continue;
+      }
+      auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, entry->timestamp, entry->payload);
+      const auto* batch = obj.has_value() ? obj->object.get<PJ::sdk::SceneEntities>() : nullptr;
+      if (batch == nullptr) {
+        continue;
+      }
+      for (const PJ::sdk::SceneEntity& entity : batch->entities) {
+        if (!entity.models.empty() && !entity.frame_id.empty()) {
+          focus_entity_ = entity;
+          break;
+        }
+      }
+    }
+    focus_scanned_entries_ = available;
+    if (!focus_entity_.has_value()) {
+      return std::nullopt;
+    }
+  }
+  for (std::size_t i = 0; i < focus_entity_->models.size(); ++i) {
+    startMeshLoadIfNeeded(meshKey(topic_id_, focus_entity_->id, i), focus_entity_->models[i]);
+  }
+  pollMeshLoads();
+  // An unloaded mesh measures as the placeholder cube, so wait for every load to land and
+  // leave out the ones that failed.
+  std::vector<MeshRenderPass::DrawCall> draws;
+  for (std::size_t i = 0; i < focus_entity_->models.size(); ++i) {
+    const PJ::sdk::ModelPrimitive& primitive = focus_entity_->models[i];
+    const std::string key = meshKey(topic_id_, focus_entity_->id, i);
+    const MeshLoadEntry* load = mesh_loads_->find(key);
+    if (load == nullptr) {
+      continue;  // no loadable source
+    }
+    if (!load->consumed) {
+      return std::nullopt;
+    }
+    if (load->failed) {
+      continue;
+    }
+    MeshRenderPass::DrawCall draw;
+    draw.kind = MeshRenderPass::GeometryKind::kMesh;
+    draw.mesh_key = key;
+    draw.model = glm::scale(poseToMat4(primitive.pose), toVec3(primitive.scale));
+    draws.push_back(std::move(draw));
+  }
+  if (draws.empty()) {
+    return std::nullopt;
+  }
+  const AABB bounds = mesh_pass_->worldBoundsOfDraws(draws);
+  if (!bounds.valid) {
+    return std::nullopt;
+  }
+  return ModelFocus{focus_entity_->frame_id, bounds};
+}
+
 bool SceneEntitiesLayer::bootstrap() {
   PJ::ObjectStore& store = ctx_.session->objectStore();
   auto first = store.at(topic_id_, 0);
@@ -367,10 +446,7 @@ bool SceneEntitiesLayer::bootstrap() {
     return false;
   }
   const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-  if (!binding) {
-    return false;
-  }
-  auto obj = parseLocked(binding, first->timestamp, first->payload);
+  auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, first->timestamp, first->payload);
   if (!obj.has_value()) {
     qCWarning(lcSceneEntitiesLayer) << "bootstrap parseObject failed:" << QString::fromStdString(obj.error());
     return false;
@@ -416,10 +492,8 @@ void SceneEntitiesLayer::renderAt(int64_t time_ns) {
     return;
   }
   const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-  if (!binding) {
-    return;
-  }
-  auto obj = parseLocked(binding, resolved->timestamp, resolved->payload);
+  auto obj =
+      resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, resolved->timestamp, resolved->payload);
   if (!obj.has_value()) {
     qCWarning(lcSceneEntitiesLayer) << "renderAt parseObject failed:" << QString::fromStdString(obj.error());
     return;
@@ -469,6 +543,7 @@ std::vector<MeshRenderPass::DrawCall> SceneEntitiesLayer::modelDrawCallsForFrame
       if (primitive.override_color) {
         draw.color = toVec4(primitive.color);
         draw.use_vertex_color = false;
+        draw.replace_materials = true;  // override_color replaces the model's materials
       } else {
         draw.color = glm::vec4(1.0f);
         draw.use_vertex_color = true;
@@ -479,6 +554,7 @@ std::vector<MeshRenderPass::DrawCall> SceneEntitiesLayer::modelDrawCallsForFrame
         draw.color = glm::vec4(
             overrides_.override_color.r, overrides_.override_color.g, overrides_.override_color.b, draw.color.a);
         draw.use_vertex_color = false;
+        draw.replace_materials = true;
       }
       draws.push_back(std::move(draw));
     }
@@ -517,10 +593,7 @@ bool SceneEntitiesLayer::applyWindow(int64_t lo_ns, int64_t hi_ns) {
       continue;  // evicted between the snapshot and the resolve
     }
     const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-    if (!binding) {
-      continue;
-    }
-    auto obj = parseLocked(binding, entry->timestamp, entry->payload);
+    auto obj = resolveObject(binding, PJ::sdk::BuiltinObjectType::kSceneEntities, entry->timestamp, entry->payload);
     if (!obj.has_value()) {
       qCWarning(lcSceneEntitiesLayer) << "applyWindow parseObject failed:" << QString::fromStdString(obj.error());
       continue;

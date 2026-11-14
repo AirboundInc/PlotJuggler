@@ -51,6 +51,13 @@ struct TrailSource {
   }
 };
 
+/// Default {past, future} colours for a new trail named `name` (e.g. its frame). The palette is 8
+/// hues evenly spaced in OKLCH at one lightness and chroma (equal perceptual distances). The slot
+/// comes from a stable hash of the name, so a name keeps its colour across sessions, and moves on
+/// to the next slot whose colour is not in `taken` (the past colours of the view's other trails)
+/// so trails in one view differ until the palette runs out. The future colour is a lighter tint.
+[[nodiscard]] std::pair<QColor, QColor> defaultTrailColors(const QString& name, const std::vector<QColor>& taken);
+
 // Scene3DLayer that draws the trajectory of a frame (or a pose topic's first
 // pose) across the whole loaded time range, split-colored at the tracker time
 // (past color before it, future color after). The polyline rebuilds

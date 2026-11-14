@@ -141,6 +141,8 @@ class TransformBuffer {
   void getAllFrames(std::vector<std::string>& out) const;
   [[nodiscard]] std::optional<std::string> getParent(const std::string& child) const;
   [[nodiscard]] std::optional<TimePoint> getLatestSample(const std::string& child) const;
+  // Oldest retained sample of `child`'s own edge (its parent chain may start later).
+  [[nodiscard]] std::optional<TimePoint> getEarliestSample(const std::string& child) const;
 
   // Depth-annotated DFS pre-order of the TF forest. Roots and same-parent
   // siblings are alphabetically sorted; cycle-safe via visited set. Frames inside

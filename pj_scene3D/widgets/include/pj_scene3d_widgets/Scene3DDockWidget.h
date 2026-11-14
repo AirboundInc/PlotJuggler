@@ -227,6 +227,12 @@ class Scene3DDockWidget : public SceneDockWidget {
   // would silently drop a saved DepthCloud layer).
   bool addTopicImpl(
       ObjectTopicId topic_id, sdk::BuiltinObjectType object_type, const QString& title, bool enforce_image_gate);
+  /// Focus on a dropped model: once pending_focus_topic_'s layer reports its model and
+  /// the model's frame resolves, centre the camera on it and follow that frame. Retried
+  /// when the layer repaints (a mesh load landed) or the TF buffer fills; dropped when
+  /// the user picks a follow frame first, the layer goes away, or the model sits on the
+  /// fixed frame (a static model, nothing to follow).
+  void tryModelFocus();
 
   [[nodiscard]] ElementRestoreResult restoreLayerElement(
       const QDomElement& layer_el, QString* deferred_topic_name = nullptr);
@@ -261,6 +267,14 @@ class Scene3DDockWidget : public SceneDockWidget {
   // belongs to the bound dataset. This is what lets the dock rebind to a second
   // dataset's TF tree after the first dataset's topics are gone (M.17).
   void resetTransformBindingIfDatasetGone();
+  // Before a topic from another dataset is added: when the bound dataset is held
+  // ONLY by config (TF) topics, which have no layer row the user could remove,
+  // drop them, forget the frames the dataset contributed, and unbind so the new topic
+  // rebinds the dock to its own dataset.
+  // TF trails are kept: they follow frames by name, so they carry over to the new
+  // tree. Returns false (binding untouched) while a render layer or pose trail of the bound
+  // dataset remains — mixing its frames with another tree would be wrong.
+  bool releaseBindingHeldOnlyByConfigTopics();
   // Connect to SessionManager::samplesIngested so streamed FrameTransform
   // messages are accumulated into the dataset's TF buffer live (file load uses
   // the bulk ingest instead). Re-callable: drops any prior connection first.
@@ -361,6 +375,10 @@ class Scene3DDockWidget : public SceneDockWidget {
   /// path skips the orphan walk while both are unchanged.
   uint64_t last_orphan_revision_ = 0;
   QString last_orphan_fixed_frame_;
+
+  /// Topic whose model the camera should focus on once it can (see tryModelFocus),
+  /// or id 0. Armed only by an interactive add while the dock follows nothing.
+  ObjectTopicId pending_focus_topic_{0};
 };
 
 }  // namespace PJ

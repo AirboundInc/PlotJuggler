@@ -87,6 +87,11 @@ class SceneViewWidget : public QOpenGLWidget {
   // policy — the "Follow frame" recenter button drives it. No-op when not following
   // or the frame can't be resolved.
   void recenterOnFollowFrame();
+  // Centre the camera on `frame_bounds` (a box in `frame`) and size the view to fit it (the
+  // orbit radius, and the top-down half-height), keeping the view angles. The frame is placed at render_time_,
+  // or at its first TF sample when the playhead is before it. False (camera untouched)
+  // when the frame can't be placed in the fixed frame.
+  bool focusOnFrameBounds(const std::string& frame, const AABB& frame_bounds);
 
   // Replace the render order: index 0 renders first (behind), the last on top.
   // For coplanar overlays (costmaps) this is what decides the overlap winner.
@@ -306,6 +311,10 @@ class SceneViewWidget : public QOpenGLWidget {
   [[nodiscard]] unsigned lastShadowMapIdForTest() const {
     return last_shadow_map_id_;
   }
+  // Test seam: the depth pick that drags and the wheel use (pickSurfaceAt).
+  [[nodiscard]] std::optional<glm::vec3> pickSurfaceAtForTest(const QPointF& pos_logical) {
+    return pickSurfaceAt(pos_logical);
+  }
   // CPU wall-time submitting the scene in paintGL (ms), smoothed with the same
   // moving average as the GPU readout. Should stay ~flat across MSAA settings —
   // the AA cost is the GPU's, not the CPU's. Excludes the HUD draw.
@@ -370,6 +379,10 @@ class SceneViewWidget : public QOpenGLWidget {
   // scratch (hover_all_frames_/hover_points_) so both call sites stay
   // allocation-free.
   [[nodiscard]] std::optional<std::string> pickFrameAt(const QPointF& pos_logical) const;
+  // World point of the surface drawn under `pos_logical` in the last frame, from a
+  // one-pixel read of the resolved scene depth, or nullopt over empty background (or
+  // without the off-screen chain). Makes the context current.
+  [[nodiscard]] std::optional<glm::vec3> pickSurfaceAt(const QPointF& pos_logical);
   // Draw the hovered TF frame's name in a small HUD box anchored at the frame's
   // CURRENT projected position (re-projected from frame_ctx so it tracks the
   // frame as the scene streams / camera moves). QPainter over the presented FBO,
@@ -486,6 +499,9 @@ class SceneViewWidget : public QOpenGLWidget {
 
   QPoint last_mouse_pos_;
   Qt::MouseButton active_button_{Qt::NoButton};
+  // Surface point picked when a left-drag started: the drag orbits about it instead of
+  // the camera's focal (ICamera::rotateAbout). nullopt = background, plain rotate().
+  std::optional<glm::vec3> orbit_pivot_;
   bool camera_gesture_changed_ = false;
 
   // ---- TF frame hover-label state ------------------------------------------

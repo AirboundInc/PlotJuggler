@@ -110,3 +110,113 @@ After the upstream review the plugin intentionally differs from PJ3: absolute ti
 first-valid-fix anchor), MSG text on `QBBZ` logs, and parameter entries with defaults. On
 AA-TRT-0051 the series set and per-series counts are unchanged and every timestamp moved by one
 constant (472 335.072 s, ±256 ns double rounding).
+
+## PJ4-only additions
+
+- **Vehicle pose for the 3D view (2026-10-24).** Object topic `_3D/frames` (`kFrameTransforms`; `_TF` until 2026-11-03), one
+  `world -> vehicle` transform per EKF sample: XKF1 of the primary EKF3 core at each moment, as
+  reported by XKF4's `PI` (core 0 if XKF4 is missing); no 3D pose without XKF1. Position is `PN/PE/PD` (metres from the EKF origin) converted to ENU
+  (x = east, y = north, z = up); attitude is `Roll/Pitch/Yaw` converted from body FRD in NED to
+  body FLU in ENU (REP-103), so the frame's x axis is the nose. Checked on AA-TRT-0051 with
+  `apbin_dump` (`OBJECT`/`TF` lines): 5652 transforms, translation and heading match the raw XKF1
+  values, roll unchanged, pitch sign flipped as FLU requires. In the app: drag `_3D/vehicle` (or `_3D/frames`) onto an empty
+  plot area to open a 3D view, then right-click the `vehicle` frame for "Create trail" and "Follow
+  this frame" (also in the 3D settings panel: Create Trail, Follow frame, Frames size).
+- **Position setpoint for the 3D view (2026-10-26).** Same `_3D/frames` topic (all transforms merged in time
+  order), frame `world -> setpoint`: the position controller's target `PSCN.TPN` / `PSCE.TPE` /
+  `PSCD.TPD` (metres north/east/down from the EKF origin, the same frame as XKF1), converted to ENU
+  like the vehicle. Rotation (2026-11-03): the attitude controller's target, `ATT.DesRoll` /
+  `DesPitch` / `DesYaw` nearest within 0.1 s, identity when none. In VTOL these are angles of the
+  quadplane's AHRS view, not the body (`Write_AttitudeView`): the view is the body rotated by
+  `Ry(y_angle + Q_TRIM_PITCH)`, `y_angle` 90 for a tailsitter (`Q_TAILSIT_ENABLE` > 0), so the
+  target body attitude is `R_des * Ry(...)` (AP_AHRS_View.cpp, quadplane.cpp `create_view`). ATT's
+  actual Roll/Pitch/Yaw are view angles too (so unusable for the vehicle; XKF1 is). Driven by PSCN's
+  timestamps; PSCE/PSCD are paired by nearest sample within 5 ms (the three are logged in the same
+  loop, ~10 us apart). Only logged while the position controller runs (VTOL / multicopter), so
+  the 3D view holds the last setpoint through fixed-wing flight. Checked on AA-TRT-0051:
+  `TFEDGES _TF ordered=yes world->setpoint=2868 world->vehicle=5652`, values equal to the raw
+  PSC fields.
+- **Aircraft model for the 3D view (2026-11-02).** Object topic `_3D/vehicle` (`kSceneEntities`; `_MODEL` until 2026-11-03, `_3D/model` until 2026-11-04): one
+  entity `aircraft`, `frame_locked` to `vehicle`, lifetime 0, published at the first vehicle pose,
+  holding the airframe's GLB as an inline `ModelPrimitive` (`model/gltf-binary`).
+  - Airframe from the board name in the boot messages (first word of a MSG):
+    `Pixhawk6C-bdshot`/`AB-TRT` -> TRT (`TRT.glb`), `AB-MOD` -> MOD (`TRT_MOD.glb`),
+    `AB-V2` -> V2 (`V2.glb`), table `kAirframeModels`. Unknown board: info message, no 3D view data (see below).
+  - Model files are Airbound's own and never go into this public repository, the installer or the
+    registry ZIP: users provide them out of band (2026-11-12). Folder: `AIRBOUND_MODELS_DIR` when
+    set, else the per-user folder (`%LOCALAPPDATA%\Airbound\PlotJuggler\models` on Windows,
+    `$XDG_DATA_HOME` or `~/.local/share` + `/airbound/plotjuggler/models` elsewhere). Deliberately
+    not next to the plugin library: under Program Files that needs admin rights and is wiped by
+    updates, and it would invite bundling the models. The whole 3D view data needs the model: when
+    the board is unknown or its model is missing or unusable, an info message names the folder to
+    copy it into and no `_3D` topic is published at all (no frames, model or terrain, and no tile
+    downloads); the plot data is unchanged (AA-TRT-0051 without the model: the same 2320 series,
+    no object topics).
+  - The models (Blender glTF exports) have the nose towards -Z, right wing +X, up +Y. The 3D
+    view's mesh loader converts glTF's Y-up to Z-up on import ((x, y, z) -> (x, -z, y)), so the
+    loaded mesh has the nose +Y, right wing +X, up +Z, and the pose rotation maps THAT to the
+    vehicle frame (FLU): -90 degrees about z. (Mapping the raw glTF axes instead double-counts the
+    loader's conversion and pitches the model 90 degrees: vertical in fixed-wing flight,
+    horizontal in hover.) Drawn with the largest dimension at 5 m (as the
+    Airbound web log viewer does, so it is visible at flight scale) and the bounding-box centre on
+    the frame origin; bounds come from the GLB's POSITION accessor min/max with node transforms.
+  - Checked on AA-TRT-0051 (board `Pixhawk6C-bdshot`): `MODEL ... id=aircraft frame=vehicle
+    locked=1 lifetime=0 airframe=TRT ... scale=3.575` (1.398 m span).
+  - Setpoint model (2026-11-03; own topic since 2026-11-04 so it can be hidden and given its own
+    opacity): object topic `_3D/setpoint`, the same GLB, entity `setpoint` locked to the
+    `setpoint` frame, `override_color` translucent red (230, 40, 40, alpha 45; the 3D view draws
+    an overridden model with a plain material, so the colour covers textured parts too). One
+    message per setpoint run (a gap over 1 s ends a run), lifetime = run length + 0.5 s, so it is
+    hidden through fixed-wing flight. Each message carries its own GLB copy. With more than one
+    run, a last message at the final vehicle pose deletes `setpoint`: the 3D view limits the
+    playhead to a multi-message topic's first..last span, so without it the view froze at the last
+    run's start (a lone message counts as valid from then on, which is why `_3D/vehicle` is one
+    message). It is a deletion because an empty batch serializes to no bytes and the codec rejects
+    that. AA-TRT-0051: `_3D/vehicle count=1`, `_3D/setpoint count=3` (2 runs), t1 = the last
+    vehicle pose.
+  - Not yet: control-surface animation (the models have one node per moving part, `~CS_*`;
+    servo roles come from `SERVOn_FUNCTION`, ranges from `SERVOn_MIN/TRIM/MAX`).
+- **Terrain for the 3D view (2026-11-04).** Object topic `_3D/terrain` (`kSceneEntities`): one
+  entity `terrain` on `world`, published at the first vehicle pose, holding a GLB built in memory
+  by `terrain.{h,cpp}`: satellite imagery draped over an elevation model around the flight.
+  - Sources (as in the Airbound web log viewer): ESRI World Imagery tiles (JPEG) and AWS Terrain
+    Tiles in Terrarium encoding (PNG, `R*256 + G + B/256 - 32768` metres above sea level). The
+    entity's metadata carries the attributions.
+  - Placement: the EKF origin from the first `ORGN` of type 0 (Lat/Lng in 1e-7 degrees unless FMTU
+    scaled them, Alt in metres AMSL), the point XKF1 positions are relative to. Lat/lon map to
+    east/north with ArduPilot's own scale (`LATLON_TO_M`, longitude scaled by the cosine of the
+    mean latitude), heights are `elevation - ORGN.Alt`. No ORGN: info message, no terrain.
+  - Area: the vehicle poses' bounding box plus max(150 m, 25 %). Imagery zoom for about 8 tiles
+    across (at most 144 tiles, zoom 10-19), elevation zoom min(imagery, 14) (Terrarium is
+    unreliable above 14). One patch per imagery tile: a 17x17 grid sampled bilinearly from the
+    elevation, textured with the tile's JPEG as downloaded (no image decoding). glTF axes
+    (east, up, -north), which the 3D view's Y-up to Z-up import turns into ENU.
+  - Downloads: libcurl (static, TLS via OpenSSL), 8 in parallel, 5 s connect / 20 s total
+    timeout. Certificates: the Windows certificate store; on Linux `SSL_CERT_FILE`, else the
+    first CA bundle found among the Debian, Fedora, openSUSE and Alpine locations, since the
+    path compiled into libcurl is the build machine's. Only tiles missing from the cache are
+    downloaded; they are kept forever under `AIRBOUND_TILE_CACHE_DIR`, else
+    `%LOCALAPPDATA%\Airbound\PlotJuggler\tiles` (`$XDG_CACHE_HOME/airbound/plotjuggler/tiles`,
+    default `~/.cache/...`, on Linux). The first tile is fetched alone; if it gets no answer
+    the rest use the cache only, so an offline load waits for one timeout.
+    `AIRBOUND_TERRAIN=0` skips terrain.
+  - Checked on AA-TRT-0051: 130 imagery tiles (zoom 19), 2 elevation tiles (zoom 14), 2.7 MB GLB;
+    first load 8.5 s (132 downloads), cached 81 ms. Vertically the terrain at the origin is
+    5.4 m below `ORGN.Alt`, and the vehicle at landing (XKF1 z = -8.1 m) is 2.8 m below the
+    terrain: GPS altitude, the elevation data (surface model, ~10 m pixels) and the EKF's height
+    drift disagree by a few metres.
+  - `apbin_dump` with `APBIN_DUMP_MODELS_DIR=<dir>` writes every inline model to `<dir>/<id>.glb`.
+- **Progress over the whole load (2026-11-05).** PJ3's bar tracked parsing only (row 4), so in PJ4
+  it sat at 100% while the rows, transforms, models and terrain were written. `load_progress.h`
+  now gives each stage a share of one bar (total 1000) by its estimated seconds: parsing and
+  processing by file size, the rows by count, the transforms by count, the models a fixed 0.3 s,
+  and the terrain 0.07 s per tile still to download plus 1 ms per cached one
+  (`terrain::count_tiles`). The estimates that depend on the parsed data are set after parsing,
+  and the bar left over is split again at each stage start, so it never moves backwards. While
+  tiles are fetched (`Options::on_tiles`) the bar follows the fetched tiles or the elapsed time
+  against the estimate, whichever is further, because single tiles can take seconds. Rows are
+  written with progress ticks, so the host also flushes them during the load. On AA-TRT-0051 the
+  bar moves steadily: about 3 s with the tile cache, about 10 s when downloading. The file is now
+  read with one sized read: `istreambuf_iterator` took 1.3 s for 53 MB.
+  - `apbin_dump` with `APBIN_DUMP_TIMINGS=1` prints every progress tick, host message and first
+    object push to stderr with the seconds since the start.

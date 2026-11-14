@@ -838,10 +838,47 @@ TEST(SceneEntitiesLayerModelTest, FrameCompositionAppliesTfPrimitivePoseAndScale
   expectMatrixNear(draws.front().model, expected);
   EXPECT_EQ(draws.front().kind, pj::scene3d::MeshRenderPass::GeometryKind::kMesh);
   EXPECT_FALSE(draws.front().use_vertex_color);
+  // override_color REPLACES the model's materials: a textured material must not
+  // multiply the tint (else only untextured parts show the color).
+  EXPECT_TRUE(draws.front().replace_materials);
   EXPECT_NEAR(draws.front().color.r, 25.0f / 255.0f, 1e-6f);
   EXPECT_NEAR(draws.front().color.g, 51.0f / 255.0f, 1e-6f);
   EXPECT_NEAR(draws.front().color.b, 76.0f / 255.0f, 1e-6f);
   EXPECT_NEAR(draws.front().color.a, 102.0f / 255.0f, 1e-6f);
+}
+
+// The viewer-side recolor replaces the materials like a message override_color does,
+// so textured parts take the chosen color too instead of tinting their texture.
+TEST(SceneEntitiesLayerModelTest, ViewerColorOverrideReplacesModelMaterials) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({makeEntity("car", 10, "base_link")}));
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(ctx.tf_buffer->setTransform(
+      pj::scene3d::StampedTransform{
+          .stamp = PJ::fromRaw(0),
+          .parent_frame = "world",
+          .child_frame = "base_link",
+          .transform = pj::scene3d::Transform({0.0, 0.0, 0.0}, {1.0, 0.0, 0.0, 0.0}),
+      }));
+  ASSERT_TRUE(layer.attach(ctx));
+  layer.setColorOverrideEnabled(true);
+  layer.setOverrideColor(QColor(0, 255, 0));
+  layer.setTrackerTime(PJ::fromRaw(10));
+
+  const std::string fixed_frame = "world";
+  const pj::scene3d::FrameContext frame_ctx{*ctx.tf_buffer, fixed_frame, PJ::fromRaw(10)};
+  const auto draws = layer.modelDrawCallsForFrame(frame_ctx);
+
+  ASSERT_EQ(draws.size(), 1u);
+  EXPECT_FALSE(draws.front().use_vertex_color);
+  EXPECT_TRUE(draws.front().replace_materials);
+  EXPECT_NEAR(draws.front().color.r, 0.0f, 1e-6f);
+  EXPECT_NEAR(draws.front().color.g, 1.0f, 1e-6f);
+  EXPECT_NEAR(draws.front().color.b, 0.0f, 1e-6f);
 }
 
 // H.8: a DATA-SUPPLIED http(s) model URL must not be fetched without the
@@ -924,6 +961,58 @@ TEST(SceneEntitiesLayerModelTest, LocalFileModelUrlLoadsWithoutOptIn) {
   EXPECT_GT(repaints, 0) << "async local-URL mesh load never landed";
   EXPECT_TRUE(layer.remoteFetchNotice().isEmpty())
       << "local file URL tripped the remote gate: " << layer.remoteFetchNotice().toStdString();
+}
+
+// modelFocus() measures the topic's first model in its own frame, whatever the playhead,
+// once the mesh has loaded; until then (and for a stub that fails to import) it has no answer.
+TEST(SceneEntitiesLayerModelTest, ModelFocusMeasuresFirstModelInItsFrame) {
+  isolateSettings();
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  const QString fixture = QString(PJ_SCENE3D_FIXTURES_DIR) + u"/meshes/cube.stl"_s;
+  PJ::sdk::SceneEntity entity =
+      makeUrlEntity("vehicle", 10, QUrl::fromLocalFile(fixture).toString().toStdString(), "model/stl");
+  entity.models.front().scale = {.x = 2.0, .y = 3.0, .z = 4.0};
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({entity}));
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  layer.setTrackerTime(PJ::fromRaw(0));  // before the model's message: no entity is live
+
+  std::optional<pj::scene3d::Scene3DLayer::ModelFocus> focus = layer.modelFocus();
+  QElapsedTimer timer;
+  timer.start();
+  while (!focus.has_value() && timer.elapsed() < 5000) {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    focus = layer.modelFocus();
+  }
+  ASSERT_TRUE(focus.has_value()) << "model focus never became available";
+  EXPECT_EQ(focus->frame, "base_link");
+  const glm::vec3 extent = focus->bounds.max - focus->bounds.min;
+  ASSERT_GT(extent.x, 0.0f);
+  // The cube fixture is a cube, so the primitive's scale shows up as the extent ratio.
+  EXPECT_NEAR(extent.y / extent.x, 1.5f, 1e-4f);
+  EXPECT_NEAR(extent.z / extent.x, 2.0f, 1e-4f);
+  EXPECT_TRUE(layer.currentEntities().empty()) << "measuring must not fold the model state";
+}
+
+TEST(SceneEntitiesLayerModelTest, ModelFocusIsEmptyWhenTheModelFailsToLoad) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({makeEntity("car", 10)}));  // stub GLB bytes
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  QElapsedTimer timer;
+  timer.start();
+  while (timer.elapsed() < 500) {
+    EXPECT_FALSE(layer.modelFocus().has_value()) << "a failed import must not report the placeholder's bounds";
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+  }
 }
 
 // A URL record exists BEFORE its bytes do (pending fetch, future default-
@@ -1234,6 +1323,56 @@ TEST(SceneEntitiesLayerModelTest, CrossBatchDeleteAllErasesOlderBatchEntities) {
   layer.setTrackerTime(PJ::fromRaw(25));
 
   EXPECT_TRUE(layer.currentEntities().empty()) << "kAll deletion in a subsequent batch did not erase earlier entities";
+}
+
+// A data-source-shaped topic: a permanent model, a ghost model republished per
+// active run with a finite lifetime, and a closing matching-id deletion. Large
+// random scrubs in both directions (incremental forward replay, cache re-folds,
+// full rebuilds) must always leave exactly the entities a fresh fold would.
+TEST(SceneEntitiesLayerModelTest, RandomLargeScrubsMatchFreshFold) {
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+
+  PJ::sdk::SceneEntity ghost_a = makeEntity("ghost", 90, "setpoint");
+  ghost_a.lifetime_ns = 50;
+  pushSceneEntities(session, topic_id, 90, batchWithEntities({ghost_a}));
+  pushSceneEntities(session, topic_id, 100, batchWithEntities({makeEntity("aircraft", 100, "vehicle")}));
+  PJ::sdk::SceneEntity ghost_b = makeEntity("ghost", 500, "setpoint");
+  ghost_b.lifetime_ns = 300;
+  pushSceneEntities(session, topic_id, 500, batchWithEntities({ghost_b}));
+  pushSceneEntities(
+      session, topic_id, 1000,
+      batchWithDeletions({{.type = PJ::sdk::SceneEntityDeletion::Type::kMatchingId, .timestamp = 1000, .id = "ghost"}}));
+
+  const auto expected = [](int64_t t) {
+    std::vector<std::string> ids;
+    if (t >= 100) {
+      ids.emplace_back("aircraft");
+    }
+    if ((t >= 90 && t <= 140) || (t >= 500 && t <= 800)) {
+      ids.emplace_back("ghost");
+    }
+    return ids;
+  };
+  const auto ids_of = [](const pj::scene3d::SceneEntitiesLayer& layer) {
+    std::vector<std::string> ids;
+    for (const auto& [id, entity] : layer.currentEntities()) {
+      ids.push_back(id);
+    }
+    return ids;
+  };
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  uint64_t state = 12345;
+  for (int step = 0; step < 2000; ++step) {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    const int64_t t = 80 + static_cast<int64_t>((state >> 33) % 1050);
+    layer.setTrackerTime(PJ::fromRaw(t));
+    ASSERT_EQ(ids_of(layer), expected(t)) << "step " << step << " t=" << t;
+  }
 }
 
 // The shared main supplies the event loop for QFutureWatcher/UrlFetcher, and the

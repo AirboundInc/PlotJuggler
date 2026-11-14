@@ -434,6 +434,7 @@ void Scene3DDockWidget::onDatasetTransformsReady(DatasetId dataset_id) {
   // end.
   onTrackerTime(last_tracker_display_);
   view_->update();
+  tryModelFocus();  // a dropped model's frame may only resolve now
 }
 
 void Scene3DDockWidget::setSessionManager(SessionManager* session) {
@@ -574,7 +575,41 @@ bool Scene3DDockWidget::handlesObjectType(sdk::BuiltinObjectType object_type) {
 
 bool Scene3DDockWidget::addTopic(ObjectTopicId topic_id, sdk::BuiltinObjectType object_type, const QString& title) {
   // Interactive add (drop / family switch): enforce the kImage depth-encoding gate.
-  return addTopicImpl(topic_id, object_type, title, /*enforce_image_gate=*/true);
+  const bool added_now = layerFor(topic_id) == nullptr;
+  if (!addTopicImpl(topic_id, object_type, title, /*enforce_image_gate=*/true)) {
+    return false;
+  }
+  if (added_now && object_type == sdk::BuiltinObjectType::kSceneEntities && view_ != nullptr &&
+      currentFollowFrame().isEmpty()) {
+    pending_focus_topic_ = topic_id;
+    tryModelFocus();
+  }
+  return true;
+}
+
+void Scene3DDockWidget::tryModelFocus() {
+  if (pending_focus_topic_.id == 0 || view_ == nullptr) {
+    return;
+  }
+  auto* layer = dynamic_cast<Scene3DLayer*>(layerFor(pending_focus_topic_));
+  if (layer == nullptr || !currentFollowFrame().isEmpty()) {
+    pending_focus_topic_ = ObjectTopicId{0};
+    return;
+  }
+  const auto focus = layer->modelFocus();
+  if (!focus.has_value()) {
+    return;
+  }
+  const QString frame = QString::fromStdString(focus->frame);
+  if (frame == currentFixedFrame()) {
+    pending_focus_topic_ = ObjectTopicId{0};
+    return;
+  }
+  if (!view_->focusOnFrameBounds(focus->frame, focus->bounds)) {
+    return;
+  }
+  pending_focus_topic_ = ObjectTopicId{0};
+  setFollowFrame(frame);
 }
 
 bool Scene3DDockWidget::addTopicImpl(
@@ -589,12 +624,6 @@ bool Scene3DDockWidget::addTopicImpl(
   if (object_type == sdk::BuiltinObjectType::kFrameTransforms && config_topics_.contains(topic_id.id)) {
     return true;
   }
-  if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
-    const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
-    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
-      return false;
-    }
-  }
   if (!handlesObjectType(object_type)) {
     qCWarning(lcScene3DDock) << "addTopic: unsupported object_type" << static_cast<int>(object_type);
     return false;
@@ -608,10 +637,29 @@ bool Scene3DDockWidget::addTopicImpl(
       !firstSampleIsDepthEncoded(*sessionManager(), topic_id)) {
     return false;
   }
+  // Only once the topic is known to be accepted: releasing the binding drops the current
+  // dataset's TF configuration, which a rejected topic must not cost the dock.
+  bool switched_dataset = false;
+  if (!isLocalLayerId(topic_id) && dataset_id_ != 0) {
+    const DatasetId incoming_dataset = sessionManager()->objectStore().descriptor(topic_id).dataset_id;
+    if (incoming_dataset != 0 && incoming_dataset != dataset_id_) {
+      if (!releaseBindingHeldOnlyByConfigTopics()) {
+        return false;
+      }
+      switched_dataset = true;
+    }
+  }
 
   const bool accepted = SceneDockWidget::addTopic(topic_id, object_type, title);
   if (accepted) {
     setWindowTitle(title.isEmpty() ? tr("3D View") : tr("3D View - %1").arg(title));
+    if (switched_dataset) {
+      // The cached render time was converted and clamped against the previous
+      // dataset's layers; re-convert the current playhead against the new one, or
+      // the view keeps looking the new dataset up at the old instant until the
+      // slider moves.
+      SceneDockWidget::onTrackerTime(last_tracker_display_);
+    }
     recomputeOrphanStates();
   }
   return accepted;
@@ -662,7 +710,21 @@ ObjectTopicId Scene3DDockWidget::addTrailLayer(const pj::scene3d::TrailSource& s
     qCWarning(lcScene3DDock) << "addTrailLayer: exhausted local topic ids";
     return ObjectTopicId{0};
   }
-  return addTrailLayerImpl(topic_id, std::make_unique<pj::scene3d::TrailLayer>(topic_id, source, this));
+  auto layer = std::make_unique<pj::scene3d::TrailLayer>(topic_id, source, this);
+  // Only interactive trails get a palette colour; restored trails keep their saved style.
+  std::vector<QColor> taken;
+  for (const SceneLayerInfo& info : layers()) {
+    if (const auto* other = trailOf(layerFor(info.topic_id)); other != nullptr) {
+      taken.push_back(other->pastColor());
+    }
+  }
+  const QString name = source.kind == pj::scene3d::TrailSource::Kind::kTfFrame
+                           ? source.frame
+                           : QString::number(source.topic.id);
+  const auto [past, future] = pj::scene3d::defaultTrailColors(name, taken);
+  layer->setPastColor(past);
+  layer->setFutureColor(future);
+  return addTrailLayerImpl(topic_id, std::move(layer));
 }
 
 ObjectTopicId Scene3DDockWidget::addTrailLayerImpl(
@@ -974,6 +1036,53 @@ void Scene3DDockWidget::prepareTransformBufferForTopic(ObjectTopicId topic_id) {
   pushTransformBufferToTrailLayers();
 }
 
+bool Scene3DDockWidget::releaseBindingHeldOnlyByConfigTopics() {
+  for (const auto& [topic, dataset] : scene_topic_datasets_) {
+    if (dataset == dataset_id_ && !config_topics_.contains(topic)) {
+      return false;  // a render layer of the bound dataset is still in the dock
+    }
+  }
+  // Pose trails have a local id, so scene_topic_datasets_ does not see their source topic.
+  ObjectStore& store = sessionManager()->objectStore();
+  for (const SceneLayerInfo& info : layers()) {
+    const auto* trail = dynamic_cast<const pj::scene3d::TrailLayer*>(layerFor(info.topic_id));
+    if (trail != nullptr && trail->source().kind == pj::scene3d::TrailSource::Kind::kPoseTopic &&
+        store.descriptor(trail->source().topic).dataset_id == dataset_id_) {
+      return false;  // a pose trail of the bound dataset is still in the dock
+    }
+  }
+  for (auto it = config_topics_.begin(); it != config_topics_.end();) {
+    if (const auto mapped = scene_topic_datasets_.find(*it);
+        mapped != scene_topic_datasets_.end() && mapped->second == dataset_id_) {
+      scene_topic_datasets_.erase(mapped);
+      it = config_topics_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  tf_buffer_.reset();
+  dataset_id_ = 0;
+  if (view_ != nullptr) {
+    view_->setTransformBuffer(nullptr);
+  }
+  // Frames the released dataset contributed, including those of its layers removed
+  // earlier, must not reach the next one's frame list (auto-root would pick them).
+  available_frames_.clear();
+  fallback_frames_.clear();
+  for (const SceneLayerInfo& info : layers()) {
+    if (auto* layer = dynamic_cast<Scene3DLayer*>(layerFor(info.topic_id)); layer != nullptr) {
+      for (const QString& frame : layer->fallbackFrames()) {
+        if (std::find(fallback_frames_.begin(), fallback_frames_.end(), frame.toStdString()) ==
+            fallback_frames_.end()) {
+          fallback_frames_.push_back(frame.toStdString());
+        }
+      }
+    }
+  }
+  pushTransformBufferToTrailLayers();  // the new topic's bind pushes the new buffer
+  return true;
+}
+
 void Scene3DDockWidget::resetTransformBindingIfDatasetGone() {
   if (tf_buffer_ == nullptr) {
     return;
@@ -1029,6 +1138,8 @@ void Scene3DDockWidget::wireScene3DLayer(Scene3DLayer* layer) {
   // per-row warning slot with the orphan state; force a recompute so the combine
   // runs even when TF/fixed-frame are unchanged (the fast-path guard would skip).
   connect(layer, &Scene3DLayer::statusWarningChanged, this, [this]() { recomputeOrphanStates(/*force=*/true); });
+  // Queued: modelFocus() polls mesh loads, which emit repaintRequested themselves.
+  connect(layer, &Scene3DLayer::repaintRequested, this, [this]() { tryModelFocus(); }, Qt::QueuedConnection);
 }
 
 void Scene3DDockWidget::absorbFallbackFrames(Scene3DLayer* layer) {
