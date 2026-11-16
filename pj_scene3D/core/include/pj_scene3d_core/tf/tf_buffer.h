@@ -121,6 +121,11 @@ class TransformBuffer {
   // (real stamps are all > epoch); callers wanting only reachability should use
   // areConnected() instead.
   [[nodiscard]] std::optional<TimePoint> latestCommonTime(const std::string& target, const std::string& source) const;
+  // Oldest time at which every edge between the two frames has a sample: the first
+  // time the whole path resolves, which can be later than either frame's own first
+  // sample. Same nullopt / single-sample / all-static TimePoint{} rules as
+  // latestCommonTime.
+  [[nodiscard]] std::optional<TimePoint> earliestCommonTime(const std::string& target, const std::string& source) const;
 
   // Union of every edge's sample stamps along the connecting path between
   // `target` and `source` (both chains up to their common ancestor), clipped to

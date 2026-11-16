@@ -162,10 +162,10 @@ class SceneEntitiesLayer : public Scene3DLayer {
   // Decode the first sample once at attach so we know the source frame and time
   // range before render is called.
   bool bootstrap();
-  // modelFocus() source: the entity, once found, and how many entries were scanned
-  // without finding one (rescanned only when the topic grows, up to a small cap).
+  // modelFocus() source: the entity, once found, and the entries already scanned without
+  // finding one (new entries are scanned as they arrive, up to a small cap in total).
   std::optional<PJ::sdk::SceneEntity> focus_entity_;
-  std::size_t focus_scanned_entries_ = 0;
+  std::vector<PJ::SequentialUID> focus_scanned_uids_;
 
   // Reset every replay/bootstrap artifact — decoded entities, the active marker
   // batch in pass_, replay cursors (last_marker_uid_ / last_applied_uid_ /

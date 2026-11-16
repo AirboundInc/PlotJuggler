@@ -377,14 +377,19 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   demand. Heading / Pose (rotation-following) modes are future work; the
   `FollowMode` enum already reserves the slot.
 - **Focus on a dropped model.** An interactive `Scene3DDockWidget::addTopic` of a
-  `kSceneEntities` topic, while the dock follows nothing, arms `pending_focus_topic_`.
-  `tryModelFocus` asks the layer for `Scene3DLayer::modelFocus()` — for
-  `SceneEntitiesLayer`, the first entity with a model among the topic's first 16
-  messages, measured in its own frame once its meshes have loaded (an unloaded mesh
+  `kSceneEntities` topic, while the dock follows nothing, queues it in
+  `pending_focus_topics_` (several can wait, so a markers-only topic dropped while a
+  model loads does not take its place; the earliest-added one that resolves wins).
+  `tryModelFocus` asks each layer for `Scene3DLayer::modelFocus()` — for
+  `SceneEntitiesLayer`, the first entity with a model among the first 16 entries the
+  layer sees (tracked by `SequentialUID`, so a streaming window's evictions do not hide
+  new entries), measured in its own frame once its meshes have loaded (an unloaded mesh
   would measure as the placeholder cube). The loads use the replay's mesh keys, so the
   real entity reuses them; nothing is folded, so the playhead can be anywhere.
   `SceneViewWidget::focusOnFrameBounds` then centres the orbit on the box, placing the
-  frame at the playhead or, before its first pose, at `TransformBuffer::getEarliestSample`,
+  frame at the playhead or, before its path resolves, at
+  `TransformBuffer::earliestCommonTime` (the first time every edge up to the fixed frame
+  has a sample),
   with radius 2.5x the box diagonal (and the diagonal as the top-down camera's
   half-height, which it frames by instead); the dock then follows that frame (seeding at
   first appearance keeps the camera on it). Retried on the layer's (queued)

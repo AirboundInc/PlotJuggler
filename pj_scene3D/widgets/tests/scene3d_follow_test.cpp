@@ -254,6 +254,46 @@ TEST(Scene3DFollow, FocusOnFrameBoundsFitsTopDownView) {
   EXPECT_GE(state.ortho_scale, 50.0f) << "the ortho half-height must cover the frame's bounds";
 }
 
+// --- View: a new TF buffer (another log) re-seeds follow instead of jumping by the
+// difference between the two logs' origins. ---
+TEST(Scene3DFollow, NewTransformBufferReseedsFollow) {
+  auto first = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);
+  setEdge(*first, "world", "robot", 100, {0.0, 0.0, 0.0});
+  auto second = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);
+  setEdge(*second, "world", "robot", 100, {100.0, 0.0, 0.0});
+
+  SceneViewWidget view;
+  view.setTransformBuffer(first);
+  view.setFixedFrame("world");
+  view.setFollowFrame("robot");
+  view.setTrackerTime(at(100));  // seed on the first log
+  const glm::vec3 focal_before = view.camera().state().focal;
+
+  view.setTransformBuffer(second);
+  view.setTrackerTime(at(200));
+  const glm::vec3 focal_after = view.camera().state().focal;
+  EXPECT_NEAR(focal_after.x, focal_before.x, 1e-4f) << "switching buffers must not shift the camera";
+}
+
+// --- View: focus before the frame's path resolves uses the first time the WHOLE path
+// does, not just the frame's own edge. ---
+TEST(Scene3DFollow, FocusOnFrameBoundsWaitsForTheWholePath) {
+  auto buf = std::make_shared<TransformBuffer>(TransformBuffer::kKeepAll);
+  setEdge(*buf, "world", "odom", 200, {10.0, 0.0, 0.0});
+  setEdge(*buf, "world", "odom", 300, {10.0, 0.0, 0.0});
+  setEdge(*buf, "odom", "robot", 100, {0.0, 5.0, 0.0});
+  setEdge(*buf, "odom", "robot", 300, {0.0, 5.0, 0.0});
+
+  SceneViewWidget view;
+  view.setTransformBuffer(buf);
+  view.setFixedFrame("world");
+  view.setTrackerTime(at(0));  // before any sample
+  const pj::scene3d::AABB bounds{.min = {-1.0f, -1.0f, -1.0f}, .max = {1.0f, 1.0f, 1.0f}, .valid = true};
+  ASSERT_TRUE(view.focusOnFrameBounds("robot", bounds));
+  EXPECT_NEAR(view.camera().state().focal.x, 10.0f, 1e-3f);
+  EXPECT_NEAR(view.camera().state().focal.y, 5.0f, 1e-3f);
+}
+
 // --- Dock: the follow target round-trips through layout XML. ---
 TEST(Scene3DFollow, DockFollowFrameRoundTripsThroughLayout) {
   PJ::SessionManager save_session;

@@ -581,35 +581,44 @@ bool Scene3DDockWidget::addTopic(ObjectTopicId topic_id, sdk::BuiltinObjectType 
   }
   if (added_now && object_type == sdk::BuiltinObjectType::kSceneEntities && view_ != nullptr &&
       currentFollowFrame().isEmpty()) {
-    pending_focus_topic_ = topic_id;
+    pending_focus_topics_.push_back(topic_id);
     tryModelFocus();
   }
   return true;
 }
 
 void Scene3DDockWidget::tryModelFocus() {
-  if (pending_focus_topic_.id == 0 || view_ == nullptr) {
+  if (pending_focus_topics_.empty() || view_ == nullptr) {
     return;
   }
-  auto* layer = dynamic_cast<Scene3DLayer*>(layerFor(pending_focus_topic_));
-  if (layer == nullptr || !currentFollowFrame().isEmpty()) {
-    pending_focus_topic_ = ObjectTopicId{0};
+  if (!currentFollowFrame().isEmpty()) {
+    pending_focus_topics_.clear();
     return;
   }
-  const auto focus = layer->modelFocus();
-  if (!focus.has_value()) {
+  for (auto it = pending_focus_topics_.begin(); it != pending_focus_topics_.end();) {
+    auto* layer = dynamic_cast<Scene3DLayer*>(layerFor(*it));
+    if (layer == nullptr) {
+      it = pending_focus_topics_.erase(it);
+      continue;
+    }
+    const auto focus = layer->modelFocus();
+    if (!focus.has_value()) {
+      ++it;
+      continue;
+    }
+    const QString frame = QString::fromStdString(focus->frame);
+    if (frame == currentFixedFrame()) {
+      it = pending_focus_topics_.erase(it);
+      continue;
+    }
+    if (!view_->focusOnFrameBounds(focus->frame, focus->bounds)) {
+      ++it;
+      continue;
+    }
+    pending_focus_topics_.clear();
+    setFollowFrame(frame);
     return;
   }
-  const QString frame = QString::fromStdString(focus->frame);
-  if (frame == currentFixedFrame()) {
-    pending_focus_topic_ = ObjectTopicId{0};
-    return;
-  }
-  if (!view_->focusOnFrameBounds(focus->frame, focus->bounds)) {
-    return;
-  }
-  pending_focus_topic_ = ObjectTopicId{0};
-  setFollowFrame(frame);
 }
 
 bool Scene3DDockWidget::addTopicImpl(

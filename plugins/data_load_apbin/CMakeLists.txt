@@ -37,6 +37,14 @@ target_link_libraries(apbin_dump PRIVATE plotjuggler_sdk::plugin_sdk nlohmann_js
 # Keep it out of the plugin folder the app scans.
 set_target_properties(apbin_dump PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/airbound_tools>")
 
+if(PJ_BUILD_TESTS AND COMMAND pj_add_test_runner)
+    pj_add_test_runner(apbin_plugin_tests
+        MAIN plain
+        SOURCES tests/load_progress_test.cpp
+    )
+    target_include_directories(apbin_plugin_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
 # `build.bat --minimal` only builds pj_app; make it build this plugin too.
 if(TARGET pj_app)
     add_dependencies(pj_app apbin_source_plugin)

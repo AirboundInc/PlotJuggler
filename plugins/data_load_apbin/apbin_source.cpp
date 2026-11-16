@@ -272,7 +272,8 @@ std::filesystem::path models_dir()
 }
 
 // Axis-aligned bounds of a GLB model's meshes in model coordinates (node transforms applied),
-// from the POSITION accessors' min/max. Only the JSON chunk is read.
+// from the POSITION accessors' min/max. Only the JSON chunk is read. Throws
+// nlohmann::json::exception when a value has the wrong type.
 struct ModelBounds
 {
   std::array<double, 3> centre;
@@ -732,6 +733,11 @@ PJ::Status APBinSource::readDataFromFile()
   file.seekg(0, std::ios::beg);
   file.read(reinterpret_cast<char*>(file_array.data()), static_cast<std::streamsize>(file_array.size()));
   const int32_t file_size = static_cast<int32_t>(file_array.size());
+  if (file_size == 0)
+  {
+    // Nothing to load, and the parse progress below divides by the size.
+    return PJ::unexpected(std::string("the file is empty: ") + filepath_);
+  }
 
   const uint8_t* buf = file_array.data();
   const uint32_t len = static_cast<uint32_t>(file_array.size());
@@ -1749,7 +1755,16 @@ void APBinSource::load_vehicle_model()
     return;
   }
   std::vector<uint8_t> glb((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  const std::optional<ModelBounds> bounds = glb_bounds(glb);
+  std::optional<ModelBounds> bounds;
+  try
+  {
+    bounds = glb_bounds(glb);
+  }
+  catch (const nlohmann::json::exception&)
+  {
+    // A value of the wrong type in the glTF JSON: as unusable as a missing one, and the model
+    // is optional, so it must not fail the whole load.
+  }
   if (!bounds || !(bounds->max_extent > 0.0))
   {
     runtimeHost().reportMessage(PJ::DataSourceMessageLevel::kWarning,

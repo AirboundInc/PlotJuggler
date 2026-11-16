@@ -37,7 +37,8 @@ public:
     }
   }
 
-  // Starts `stage`; stages run in order, and skipped stages count as done. False when cancelled.
+  // Starts `stage`; stages run in order, and skipped stages count as done. False when cancelled,
+  // here or by any earlier call.
   bool begin(size_t stage)
   {
     if (started_)
@@ -49,23 +50,33 @@ public:
     base_ = static_cast<double>(value_);
     const double remaining = std::accumulate(costs_.begin() + static_cast<std::ptrdiff_t>(stage), costs_.end(), 0.0);
     span_ = remaining > 0.0 ? (static_cast<double>(kTotal) - base_) * costs_[stage] / remaining : 0.0;
-    return report_(value_);
+    return report(value_);
   }
 
   // Moves to `fraction` (0..1) of the current stage. Only reports when the bar moves by 0.2% or
-  // more. False when cancelled.
+  // more. False when cancelled, here or by any earlier call (also when this call is not reported:
+  // a stage that stopped on a cancel must not have its last update turn the load into a success).
   bool advance(double fraction)
   {
     const auto value = static_cast<uint64_t>(base_ + span_ * std::clamp(fraction, 0.0, 1.0));
     if (value < value_ + 2)
     {
-      return true;
+      return !cancelled_;
     }
     value_ = std::min(value, kTotal);
-    return report_(value_);
+    return report(value_);
   }
 
 private:
+  bool report(uint64_t value)
+  {
+    if (!cancelled_ && !report_(value))
+    {
+      cancelled_ = true;
+    }
+    return !cancelled_;
+  }
+
   std::vector<double> costs_;
   std::function<bool(uint64_t)> report_;
   bool started_ = false;
@@ -73,6 +84,7 @@ private:
   double base_ = 0.0;
   double span_ = 0.0;
   uint64_t value_ = 0;
+  bool cancelled_ = false;  // the host said cancelled once: every later call says so too
 };
 
 }  // namespace airbound

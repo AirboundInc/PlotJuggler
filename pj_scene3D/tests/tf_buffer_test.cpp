@@ -565,5 +565,16 @@ TEST(TransformBufferTest, EarliestAndLatestSampleOfAFrame) {
   EXPECT_EQ(buffer.getLatestSample("A"), tp(30ns));
 }
 
+TEST(TransformBufferTest, EarliestCommonTimeIsWhenTheWholePathStarts) {
+  TransformBuffer buffer;
+  (void)buffer.setTransform(makeStamped("world", "odom", tp(200ns), makeTranslation(1.0)));
+  (void)buffer.setTransform(makeStamped("world", "odom", tp(300ns), makeTranslation(1.0)));
+  (void)buffer.setTransform(makeStamped("odom", "robot", tp(100ns), makeTranslation(2.0)));
+  (void)buffer.setTransform(makeStamped("odom", "robot", tp(300ns), makeTranslation(2.0)));
+  EXPECT_EQ(buffer.earliestCommonTime("world", "robot"), tp(200ns));
+  EXPECT_TRUE(buffer.tryLookupTransform("world", "robot", tp(200ns)).has_value());
+  EXPECT_FALSE(buffer.earliestCommonTime("world", "unknown").has_value());
+}
+
 }  // namespace
 }  // namespace PJ

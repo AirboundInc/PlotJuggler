@@ -523,6 +523,8 @@ void SceneViewWidget::setTransformBuffer(std::shared_ptr<TransformBuffer> tf) {
     return;
   }
   tf_ = std::move(tf);
+  // The followed frame's last origin belongs to the old buffer: re-seed from the new one.
+  follow_seeded_ = false;
   last_frames_revision_ = ~uint64_t{0};
   refreshAvailableFrames();
   update();

@@ -294,7 +294,7 @@ void SceneEntitiesLayer::resetReplayState() {
   entity_expiry_anchor_ns_.clear();
   model_frames_.clear();
   focus_entity_.reset();
-  focus_scanned_entries_ = 0;
+  focus_scanned_uids_.clear();
   state_built_at_.reset();
   applied_uid_high_ = {};
   snapshot_cache_.clear();
@@ -372,17 +372,27 @@ std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
     return std::nullopt;
   }
   if (!focus_entity_.has_value()) {
-    // A model topic carries its model in its first message or close to it; the cap keeps
-    // a markers-only topic from being decoded end to end on every retry.
+    // A model topic carries its model in its first message or close to it: only the first
+    // entries this layer sees are decoded, so a markers-only topic is never decoded end to
+    // end on retries. Tracked by uid, not index: a streaming window evicts old entries.
     constexpr std::size_t kMaxScannedEntries = 16;
-    PJ::ObjectStore& store = ctx_.session->objectStore();
-    const std::size_t available = std::min(store.entryCount(topic_id_), kMaxScannedEntries);
-    if (available <= focus_scanned_entries_) {
+    if (focus_scanned_uids_.size() >= kMaxScannedEntries) {
       return std::nullopt;
     }
+    PJ::ObjectStore& store = ctx_.session->objectStore();
     const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-    for (std::size_t index = focus_scanned_entries_; index < available && !focus_entity_.has_value(); ++index) {
-      const auto entry = store.at(topic_id_, index);
+    const auto retained = store.rangeByTime(
+        topic_id_, std::numeric_limits<PJ::Timestamp>::min(), std::numeric_limits<PJ::Timestamp>::max());
+    for (const auto& id : retained) {
+      if (focus_entity_.has_value() || focus_scanned_uids_.size() >= kMaxScannedEntries) {
+        break;
+      }
+      if (std::find(focus_scanned_uids_.begin(), focus_scanned_uids_.end(), id.uid) !=
+          focus_scanned_uids_.end()) {
+        continue;
+      }
+      focus_scanned_uids_.push_back(id.uid);
+      const auto entry = store.at(topic_id_, id.uid);
       if (!entry.has_value() || entry->payload.bytes.empty()) {
         continue;
       }
@@ -398,7 +408,6 @@ std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
         }
       }
     }
-    focus_scanned_entries_ = available;
     if (!focus_entity_.has_value()) {
       return std::nullopt;
     }

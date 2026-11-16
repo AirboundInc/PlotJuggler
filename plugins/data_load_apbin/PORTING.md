@@ -198,7 +198,9 @@ constant (472 335.072 s, ±256 ns double rounding).
     downloaded; they are kept forever under `AIRBOUND_TILE_CACHE_DIR`, else
     `%LOCALAPPDATA%\Airbound\PlotJuggler\tiles` (`$XDG_CACHE_HOME/airbound/plotjuggler/tiles`,
     default `~/.cache/...`, on Linux). The first tile is fetched alone; if it gets no answer
-    the rest use the cache only, so an offline load waits for one timeout.
+    the rest use the cache only, so an offline load waits for one timeout. Only responses that
+    are images (JPEG/PNG magic) are cached, so an error page served with a 200 is retried on the
+    next load rather than kept; a tile worker that cannot start leaves the work to the others.
     `AIRBOUND_TERRAIN=0` skips terrain.
   - Checked on AA-TRT-0051: 130 imagery tiles (zoom 19), 2 elevation tiles (zoom 14), 2.7 MB GLB;
     first load 8.5 s (132 downloads), cached 81 ms. Vertically the terrain at the origin is
@@ -217,6 +219,8 @@ constant (472 335.072 s, ±256 ns double rounding).
   against the estimate, whichever is further, because single tiles can take seconds. Rows are
   written with progress ticks, so the host also flushes them during the load. On AA-TRT-0051 the
   bar moves steadily: about 3 s with the tile cache, about 10 s when downloading. The file is now
-  read with one sized read: `istreambuf_iterator` took 1.3 s for 53 MB.
+  read with one sized read: `istreambuf_iterator` took 1.3 s for 53 MB. A cancel is latched: once
+  the host says stop, every later update says so too, so a stage that stopped on it (the terrain)
+  cannot have the load's last update report success. An empty file fails the load up front.
   - `apbin_dump` with `APBIN_DUMP_TIMINGS=1` prints every progress tick, host message and first
     object push to stderr with the seconds since the start.

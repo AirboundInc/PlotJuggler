@@ -963,6 +963,40 @@ TEST(SceneEntitiesLayerModelTest, LocalFileModelUrlLoadsWithoutOptIn) {
       << "local file URL tripped the remote gate: " << layer.remoteFetchNotice().toStdString();
 }
 
+// A streaming window that evicts an old markers-only entry as a model entry arrives
+// leaves the entry count unchanged: modelFocus() must still scan the new entry.
+TEST(SceneEntitiesLayerModelTest, ModelFocusScansEntriesArrivingAfterEviction) {
+  isolateSettings();
+  PJ::SessionManager session;
+  const PJ::ObjectTopicId topic_id = registerTopic(session);
+  registerParser(session, topic_id);
+  session.objectStore().setRetentionBudget(topic_id, PJ::RetentionBudget{.max_entries = 1});
+  PJ::sdk::SceneEntity markers = makeEntity("markers", 10);
+  markers.models.clear();
+  markers.cubes.push_back(PJ::sdk::CubePrimitive{});
+  pushSceneEntities(session, topic_id, 10, batchWithEntities({markers}));
+
+  pj::scene3d::SceneEntitiesLayer layer(topic_id, u"/scene_entities"_s);
+  const auto ctx = makeContext(session);
+  ASSERT_TRUE(layer.attach(ctx));
+  ASSERT_FALSE(layer.modelFocus().has_value()) << "a markers-only entry has no model";
+
+  const QString fixture = QString(PJ_SCENE3D_FIXTURES_DIR) + u"/meshes/cube.stl"_s;
+  pushSceneEntities(session, topic_id, 20,
+                    batchWithEntities({makeUrlEntity(
+                        "vehicle", 20, QUrl::fromLocalFile(fixture).toString().toStdString(), "model/stl")}));
+  ASSERT_EQ(session.objectStore().entryCount(topic_id), 1u);
+
+  std::optional<pj::scene3d::Scene3DLayer::ModelFocus> focus = layer.modelFocus();
+  QElapsedTimer timer;
+  timer.start();
+  while (!focus.has_value() && timer.elapsed() < 5000) {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    focus = layer.modelFocus();
+  }
+  EXPECT_TRUE(focus.has_value()) << "the model entry that replaced the markers was never scanned";
+}
+
 // modelFocus() measures the topic's first model in its own frame, whatever the playhead,
 // once the mesh has loaded; until then (and for a stub that fails to import) it has no answer.
 TEST(SceneEntitiesLayerModelTest, ModelFocusMeasuresFirstModelInItsFrame) {

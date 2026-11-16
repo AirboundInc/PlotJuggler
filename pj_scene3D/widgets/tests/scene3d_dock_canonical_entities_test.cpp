@@ -28,10 +28,11 @@ using namespace Qt::StringLiterals;
 namespace {
 
 PJ::ObjectTopicId registerCanonicalEntitiesTopic(
-    PJ::ObjectStore& store, PJ::Timestamp ts, PJ::DatasetId dataset = 1, const std::string& frame = "vehicle") {
+    PJ::ObjectStore& store, PJ::Timestamp ts, PJ::DatasetId dataset = 1, const std::string& frame = "vehicle",
+    const std::string& topic_name = "_MODEL") {
   PJ::ObjectTopicDescriptor desc;
   desc.dataset_id = dataset;
-  desc.topic_name = "_MODEL";
+  desc.topic_name = topic_name;
   desc.metadata_json = R"({"builtin_object_type":"kSceneEntities"})";
   const auto id = store.registerTopic(desc);
   EXPECT_TRUE(id.has_value());
@@ -288,6 +289,29 @@ TEST(Scene3DDockCanonicalEntities, DroppedModelFocusesAndFollowsItsFrame) {
   EXPECT_NEAR(state.focal.y, 2.0f, 1e-3f);
   EXPECT_NEAR(state.focal.z, 0.0f, 1e-3f);
   EXPECT_NEAR(state.radius, 2.5f * std::sqrt(20.0f), 1e-3f);
+}
+
+// A markers-only topic dropped while a model is still loading must not take the model's
+// focus request: it never has a model to focus on.
+TEST(Scene3DDockCanonicalEntities, MarkersDroppedWhileModelLoadsKeepModelFocus) {
+  PJ::SessionManager session;
+  pj::scene3d::TransformService transform_service(session);
+  PJ::ObjectStore& store = session.objectStore();
+  const PJ::ObjectTopicId tf = registerMovingTfTopic(store, "vehicle");
+  const PJ::ObjectTopicId model = registerInlineModelTopic(store, "vehicle", 100);
+  const PJ::ObjectTopicId markers = registerCanonicalEntitiesTopic(store, 100, 1, "vehicle", "_MARKERS");
+  transform_service.ingestFrameTransformsForDataset(1);
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(tf, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"_TF"_s));
+  ASSERT_TRUE(dock.addTopic(model, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
+  ASSERT_TRUE(dock.currentFollowFrame().isEmpty()) << "the model's mesh loads asynchronously";
+  ASSERT_TRUE(dock.addTopic(markers, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MARKERS"_s));
+
+  EXPECT_TRUE(pumpUntil([&] { return dock.currentFollowFrame() == u"vehicle"_s; }))
+      << "the markers topic displaced the model's focus request";
 }
 
 // A model on the fixed frame (terrain, a static map) has nothing to follow: the camera

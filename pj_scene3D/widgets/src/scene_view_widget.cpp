@@ -242,6 +242,9 @@ void SceneViewWidget::setTransformBuffer(std::shared_ptr<TransformBuffer> tf) {
     return;
   }
   tf_ = std::move(tf);
+  // The followed frame's last origin belongs to the old buffer (another dataset's
+  // log): re-seed from the new one instead of shifting by the difference.
+  follow_seeded_ = false;
   refreshAvailableFrames();
   update();
 }
@@ -332,7 +335,9 @@ bool SceneViewWidget::focusOnFrameBounds(const std::string& frame, const AABB& f
   }
   auto x = tf_->tryLookupTransform(fixed_frame_, frame, render_time_);
   if (!x) {
-    if (const auto first = tf_->getEarliestSample(frame); first.has_value()) {
+    // Before the frame's path resolves (e.g. the playhead at the log start): where the
+    // frame first is, which needs every edge up to the fixed frame, not only its own.
+    if (const auto first = tf_->earliestCommonTime(fixed_frame_, frame); first.has_value()) {
       x = tf_->tryLookupTransform(fixed_frame_, frame, *first);
     }
   }

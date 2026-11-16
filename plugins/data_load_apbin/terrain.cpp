@@ -279,6 +279,19 @@ std::filesystem::path cache_path(const std::filesystem::path& cache_dir, const T
          (std::to_string(tile.y) + source.extension);
 }
 
+const char* image_mime_type(const std::vector<uint8_t>& bytes)
+{
+  if (bytes.size() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+  {
+    return "image/jpeg";
+  }
+  if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G')
+  {
+    return "image/png";
+  }
+  return nullptr;  // not an image (e.g. an error page): leave the patch untextured
+}
+
 // Cache-first tile access. After a network error (or when downloads are off) only the cache is
 // used, so an offline load costs one connect timeout, not one per tile. Reports progress through
 // Options::on_tiles, counting `total_tiles` over all get_all calls.
@@ -293,7 +306,10 @@ public:
   std::optional<std::vector<uint8_t>> get(const TileSource& source, const TileId& tile)
   {
     const std::filesystem::path path = cache_path(options_.cache_dir, source, tile);
-    if (auto cached = read_file(path))
+    // Only images are cached, so an error page served with a 200 is not kept as the tile for good;
+    // a cached file that is not an image is downloaded again.
+    std::optional<std::vector<uint8_t>> cached = read_file(path);
+    if (cached && image_mime_type(*cached) != nullptr)
     {
       return cached;
     }
@@ -308,11 +324,12 @@ public:
       offline_ = true;
       return std::nullopt;
     }
-    if (result.body)
+    if (!result.body || image_mime_type(*result.body) == nullptr)
     {
-      write_file(path, *result.body);
-      ++downloaded_;
+      return std::nullopt;
     }
+    write_file(path, *result.body);
+    ++downloaded_;
     return std::move(result.body);
   }
 
@@ -356,29 +373,48 @@ public:
   }
 
 private:
-  // Runs `work` on `threads` threads and reports progress until they all finish.
+  // Runs `work` on up to `threads` threads and reports progress until they all finish. `work`
+  // must be safe to run on fewer threads (as many as the system starts, or only the caller's).
   void run_reporting(size_t threads, const std::function<void()>& work)
   {
     std::mutex mutex;
     std::condition_variable finished;
-    size_t running = threads;
+    size_t running = 0;
     std::vector<std::thread> pool;
+    pool.reserve(threads);  // so only a thread start can throw below
+    // Held while starting the workers, so a worker that finishes early waits to count itself out.
+    std::unique_lock<std::mutex> lock(mutex);
     for (size_t t = 0; t < threads; ++t)
     {
-      pool.emplace_back([&] {
-        work();
-        const std::lock_guard<std::mutex> lock(mutex);
-        --running;
-        finished.notify_one();
-      });
+      try
+      {
+        pool.emplace_back([&] {
+          work();
+          const std::lock_guard<std::mutex> worker_lock(mutex);
+          --running;
+          finished.notify_one();
+        });
+      }
+      catch (const std::system_error&)
+      {
+        break;  // out of threads: the ones started share the work
+      }
+      ++running;
     }
-    for (std::unique_lock<std::mutex> lock(mutex);
-         !finished.wait_for(lock, std::chrono::milliseconds(30), [&] { return running == 0; });)
+    if (pool.empty())
+    {
+      lock.unlock();
+      work();
+      report();
+      return;
+    }
+    while (!finished.wait_for(lock, std::chrono::milliseconds(30), [&] { return running == 0; }))
     {
       lock.unlock();
       report();
       lock.lock();
     }
+    lock.unlock();
     for (std::thread& thread : pool)
     {
       thread.join();
@@ -561,19 +597,6 @@ private:
   nlohmann::json views_ = nlohmann::json::array();
   nlohmann::json accessors_ = nlohmann::json::array();
 };
-
-const char* image_mime_type(const std::vector<uint8_t>& bytes)
-{
-  if (bytes.size() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-  {
-    return "image/jpeg";
-  }
-  if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G')
-  {
-    return "image/png";
-  }
-  return nullptr;  // not an image (e.g. an error page): leave the patch untextured
-}
 
 }  // namespace
 
