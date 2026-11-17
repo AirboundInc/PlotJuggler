@@ -3,14 +3,21 @@
 # (originally https://github.com/ArduPilot/plotjuggler-apbin-plugins).
 
 find_package(nlohmann_json REQUIRED)
+# 3D terrain: tiles downloaded with libcurl, Terrarium elevation PNGs decoded with libpng.
+find_package(CURL REQUIRED)
+find_package(PNG REQUIRED)
 
 add_library(apbin_source_plugin SHARED
     apbin_source.cpp
-    logformat.h)
+    logformat.h
+    terrain.cpp
+    terrain.h)
 target_compile_features(apbin_source_plugin PRIVATE cxx_std_20)
 target_link_libraries(apbin_source_plugin PRIVATE
     plotjuggler_sdk::plugin_sdk
-    nlohmann_json::nlohmann_json)
+    nlohmann_json::nlohmann_json
+    CURL::libcurl
+    PNG::PNG)
 target_include_directories(apbin_source_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Optional: uncomment to enable units display in field names (as in PJ3)
@@ -29,6 +36,14 @@ target_compile_features(apbin_dump PRIVATE cxx_std_20)
 target_link_libraries(apbin_dump PRIVATE plotjuggler_sdk::plugin_sdk nlohmann_json::nlohmann_json)
 # Keep it out of the plugin folder the app scans.
 set_target_properties(apbin_dump PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/airbound_tools>")
+
+if(PJ_BUILD_TESTS AND COMMAND pj_add_test_runner)
+    pj_add_test_runner(apbin_plugin_tests
+        MAIN plain
+        SOURCES tests/load_progress_test.cpp
+    )
+    target_include_directories(apbin_plugin_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
 # `build.bat --minimal` only builds pj_app; make it build this plugin too.
 if(TARGET pj_app)

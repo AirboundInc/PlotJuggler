@@ -784,7 +784,7 @@ bool MeshRenderPass::drawNeedsVisualBlending(const DrawCall& draw, bool mesh_has
   if (!draw.use_vertex_color && draw.color.a < kOpaqueAlphaThreshold) {
     return true;
   }
-  return mesh_has_blended_material;
+  return mesh_has_blended_material && !draw.replace_materials;
 }
 
 void MeshRenderPass::drawOne(
@@ -813,7 +813,7 @@ void MeshRenderPass::drawOne(
   program_->setInt("u_ao_tex", 3);
   program_->setInt("u_emissive_tex", 4);
   resource.vao.bind();
-  withGlFunctions([this, &resource, &shading](auto& functions) {
+  withGlFunctions([this, &draw, &resource, &shading](auto& functions) {
     // Locations were cached once at link time (initializeGL), not re-queried here.
     const GLint loc_has_base = uniforms_.has_base;
     const GLint loc_has_mr = uniforms_.has_mr;
@@ -839,8 +839,10 @@ void MeshRenderPass::drawOne(
     bool cull_enabled = cull_was_enabled;
 
     for (const SubMesh& submesh : resource.data.submeshes) {
-      const Material& mat = submesh.material != nullptr ? *submesh.material : fallbackMaterial();
-      const bool wants_cull = cull_was_enabled && !mat.double_sided;
+      const Material& own = submesh.material != nullptr ? *submesh.material : fallbackMaterial();
+      const Material& mat = draw.replace_materials ? fallbackMaterial() : own;
+      // Sidedness is geometry, not look: a replaced material keeps the mesh's own.
+      const bool wants_cull = cull_was_enabled && !own.double_sided;
       if (wants_cull != cull_enabled) {
         if (wants_cull) {
           functions.glEnable(GL_CULL_FACE);

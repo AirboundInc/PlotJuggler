@@ -350,8 +350,9 @@ if(PJ4_BUILD_APP)
 endif()
 
 # Airbound in-tree plugins (plugins/), built against the pinned plotjuggler_sdk.
+# Desktop only: the browser build loads no plugin DLLs and has no CURL.
 option(AIRBOUND_BUILD_PLUGINS "Build the Airbound plugins in plugins/" ON)
-if(AIRBOUND_BUILD_PLUGINS)
+if(AIRBOUND_BUILD_PLUGINS AND NOT EMSCRIPTEN)
     add_subdirectory(plugins)
 endif()
 

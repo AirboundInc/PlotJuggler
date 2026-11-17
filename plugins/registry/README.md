@@ -42,8 +42,8 @@ entry with the same id.
 
 ## Files
 
-- `build_plugin.ps1` builds one plugin on its own (only `plotjuggler_sdk` and
-  `nlohmann_json`, at the app's pins) and writes the marketplace ZIP in the
+- `build_plugin.ps1` builds one plugin on its own (only what the plugins link:
+  `plotjuggler_sdk`, `nlohmann_json`, `libcurl` and `libpng`, at the app's pins) and writes the marketplace ZIP in the
   official layout (`<id>/<dll>`, `<id>/manifest.json`) plus its SHA-256. Runs
   locally too, with the same prerequisites as `build.bat`:
   `.\plugins\registry\build_plugin.ps1 -Plugin data_load_apbin`

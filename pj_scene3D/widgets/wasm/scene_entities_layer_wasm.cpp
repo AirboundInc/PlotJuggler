@@ -1052,6 +1052,7 @@ void WasmSceneEntitiesLayer::refreshModelDrawCalls() {
               .model = model,
               .override_color = colorVector(primitive.color),
               .use_material = !primitive.override_color,
+              .replace_materials = primitive.override_color,
           });
     }
   }

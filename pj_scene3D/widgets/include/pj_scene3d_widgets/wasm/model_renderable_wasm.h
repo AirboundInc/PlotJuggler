@@ -26,6 +26,10 @@ struct WasmModelDrawCall {
   glm::dmat4 model{1.0};
   glm::vec4 override_color{1.0F};
   bool use_material = true;
+  // Shade with a plain default material (no textures or glTF PBR/alpha), as for a
+  // SceneEntities ModelPrimitive whose override_color replaces the model's
+  // materials. Mirrors MeshRenderPass::DrawCall::replace_materials.
+  bool replace_materials = false;
   WasmModelDrawGroup group = WasmModelDrawGroup::kIndependent;
 };
 

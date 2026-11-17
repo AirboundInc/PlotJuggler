@@ -560,6 +560,28 @@ TEST(TransformService, ActiveTapMakesIncrementalDrainAZeroResolveNoOp) {
   EXPECT_TRUE(resolves(*service.transformBuffer(1), "f0", "f1", 100));
 }
 
+// A data source that pushes serialized canonical FrameTransforms (no parser) never
+// passes the ingest tap, which only sees parser-routed bytes. With the tap active,
+// the post-load publish and live ingest must still drain those topics, or their
+// frames never reach the buffer.
+TEST(TransformService, ActiveTapStillIngestsCanonicalTopics) {
+  PJ::SessionManager session;
+  PJ::ObjectStore& store = session.objectStore();
+  const auto topic = registerCanonicalTfTopic(store, /*dataset_id=*/1, "_TF");
+  ASSERT_TRUE(store.pushOwned(topic, 100, canonicalEdgePayload("world", "vehicle", 100)).has_value());
+
+  TransformService service(session);
+  service.activateIngestTap();
+  service.publishTransforms(/*dataset_id=*/1);
+  EXPECT_TRUE(resolves(*service.transformBuffer(1), "world", "vehicle", 100))
+      << "a canonical TF topic must be ingested on publish even with the tap active";
+
+  // Later entries arrive through the same incremental path.
+  ASSERT_TRUE(store.pushOwned(topic, 200, canonicalEdgePayload("vehicle", "sensor", 200)).has_value());
+  EXPECT_TRUE(service.ingestNewTransforms(/*dataset_id=*/1));
+  EXPECT_TRUE(resolves(*service.transformBuffer(1), "world", "sensor", 200));
+}
+
 TEST(TransformService, ExplicitRebuildWithTapActiveMatchesTapBuiltBuffer) {
   PJ::SessionManager session;
   const auto topic = registerMockTfTopic(session, /*dataset_id=*/1, "/tf");
@@ -741,6 +763,64 @@ TEST(TransformService, AbortReplacingLoadPreservesTapBufferAndRebuildsInactiveBu
     EXPECT_FALSE(resolves(*active, "f0", "f2", 200))
         << "inactive rollback must rebuild from the restored store, removing aborted edges";
   }
+}
+
+// A replacing reload of a data source that pushes canonical TF: the progress publishes must
+// not feed the reload's transforms into the generation still on screen, and the committed
+// generation must hold them without waiting for another publish.
+TEST(TransformService, ReplacingLoadCommitsCanonicalTransformsOfNewGeneration) {
+  PJ::SessionManager session;
+  const auto dataset =
+      session.dataEngine().createDataset(PJ::DatasetDescriptor{.source_name = "canonical_reload", .time_domain_id = 0});
+  ASSERT_TRUE(dataset.has_value()) << dataset.error();
+  PJ::ObjectStore& store = session.objectStore();
+  const auto topic = registerCanonicalTfTopic(store, *dataset, "_3D/frames");
+  ASSERT_TRUE(store.pushOwned(topic, 100, canonicalEdgePayload("world", "vehicle", 100)).has_value());
+  TransformService service(session);
+  service.activateIngestTap();
+  service.publishTransforms(*dataset);
+  const auto old_buffer = service.transformBuffer(*dataset);
+  ASSERT_TRUE(resolves(*old_buffer, "world", "vehicle", 100));
+
+  service.beginReplacingLoad(*dataset);
+  {
+    auto refill = session.beginRefill(*dataset);
+    ASSERT_TRUE(store.pushOwned(topic, 200, canonicalEdgePayload("world", "setpoint", 200)).has_value());
+    service.publishTransforms(*dataset);  // a progress publish mid-load
+    EXPECT_FALSE(resolves(*old_buffer, "world", "setpoint", 200)) << "the reload leaked into the old generation";
+    refill.commit();
+  }
+  service.commitReplacingLoad(*dataset);
+
+  const auto committed = service.transformBuffer(*dataset);
+  EXPECT_TRUE(resolves(*committed, "world", "setpoint", 200)) << "the committed generation lost its canonical TF";
+  EXPECT_FALSE(resolves(*committed, "world", "vehicle", 100));
+}
+
+TEST(TransformService, AbortedReplacingLoadLeavesCanonicalTransformsUntouched) {
+  PJ::SessionManager session;
+  const auto dataset =
+      session.dataEngine().createDataset(PJ::DatasetDescriptor{.source_name = "canonical_abort", .time_domain_id = 0});
+  ASSERT_TRUE(dataset.has_value()) << dataset.error();
+  PJ::ObjectStore& store = session.objectStore();
+  const auto topic = registerCanonicalTfTopic(store, *dataset, "_3D/frames");
+  ASSERT_TRUE(store.pushOwned(topic, 100, canonicalEdgePayload("world", "vehicle", 100)).has_value());
+  TransformService service(session);
+  service.activateIngestTap();
+  service.publishTransforms(*dataset);
+  const auto active = service.transformBuffer(*dataset);
+
+  service.beginReplacingLoad(*dataset);
+  {
+    auto refill = session.beginRefill(*dataset);  // destroyed uncommitted: rolls the store back
+    ASSERT_TRUE(store.pushOwned(topic, 200, canonicalEdgePayload("world", "setpoint", 200)).has_value());
+    service.publishTransforms(*dataset);
+  }
+  service.abortReplacingLoad(*dataset);
+
+  EXPECT_EQ(service.transformBuffer(*dataset), active);
+  EXPECT_TRUE(resolves(*active, "world", "vehicle", 100));
+  EXPECT_FALSE(resolves(*active, "world", "setpoint", 200)) << "the aborted load's TF stayed on screen";
 }
 
 TEST(TransformService, TapRoutingChangesOnlyAtGenerationBoundaries) {

@@ -295,6 +295,38 @@ std::optional<TimePoint> TransformBuffer::latestCommonTime(const std::string& ta
   return result.value_or(TimePoint{});
 }
 
+std::optional<TimePoint> TransformBuffer::earliestCommonTime(const std::string& target, const std::string& source) const {
+  std::shared_lock lock(parents_mutex_);
+
+  static thread_local std::vector<ChainHop> tgt_chain;
+  static thread_local std::vector<ChainHop> src_chain;
+  chainToRoot(target, tgt_chain);
+  chainToRoot(source, src_chain);
+
+  const MeetPoint meet = findCommonAncestor(src_chain, tgt_chain);
+  if (!meet.found) {
+    return std::nullopt;
+  }
+
+  // The path resolves once its latest-starting edge has begun. A single-sample edge
+  // counts too: it holds forward from its stamp, never before it.
+  auto walk = [](const std::vector<ChainHop>& chain, std::size_t k, std::optional<TimePoint>& acc) {
+    for (std::size_t i = 0; i < k; ++i) {
+      const auto& edge = chain[i].link->history;
+      if (edge.samples.empty()) {
+        continue;
+      }
+      const auto earliest = edge.samples.front().first;
+      acc = acc ? std::max(*acc, earliest) : earliest;
+    }
+  };
+
+  std::optional<TimePoint> result;
+  walk(src_chain, meet.src_k, result);
+  walk(tgt_chain, meet.tgt_k, result);
+  return result.value_or(TimePoint{});
+}
+
 void TransformBuffer::chainSampleTimes(
     const std::string& target, const std::string& source, TimePoint lo, TimePoint hi,
     std::vector<TimePoint>& out) const {
@@ -370,6 +402,15 @@ std::optional<TimePoint> TransformBuffer::getLatestSample(const std::string& chi
     return std::nullopt;
   }
   return history.samples.back().first;
+}
+
+std::optional<TimePoint> TransformBuffer::getEarliestSample(const std::string& child) const {
+  std::shared_lock lock(parents_mutex_);
+  auto it = parents_.find(child);
+  if (it == parents_.end() || it->second.history.samples.empty()) {
+    return std::nullopt;
+  }
+  return it->second.history.samples.front().first;
 }
 
 void TransformBuffer::clear() {

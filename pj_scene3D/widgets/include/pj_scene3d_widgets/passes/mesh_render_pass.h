@@ -65,6 +65,13 @@ class MeshRenderPass : public IRenderPass {
     glm::mat4 model{1.0f};
     glm::vec4 color{0.7f, 0.7f, 0.7f, 1.0f};
     bool use_vertex_color{true};
+    // Shade every submesh with a plain default material (no textures, no glTF
+    // metallic-roughness or alpha mode), so `color` alone gives the look. Set for a
+    // SceneEntities ModelPrimitive with override_color, whose contract is that the
+    // color REPLACES the model's materials; otherwise a textured material still
+    // multiplies the tint and only untextured parts show the color. URDF link
+    // colors leave it off and keep tinting the mesh's textures.
+    bool replace_materials{false};
   };
 
   // One entry of the per-pass texture cache. The same source key may legally
@@ -93,7 +100,8 @@ class MeshRenderPass : public IRenderPass {
 
   // True when a visual draw belongs in the translucent bucket: layer opacity < 1,
   // an override tint with alpha < 1, or a mesh with any glTF kBlend material
-  // (pass the cached meshHasBlendedMaterial result). Static and GL-free so the
+  // (pass the cached meshHasBlendedMaterial result; ignored when the draw
+  // replaces the materials). Static and GL-free so the
   // opaque/translucent split stays unit-testable without a live context.
   [[nodiscard]] static bool drawNeedsVisualBlending(
       const DrawCall& draw, bool mesh_has_blended_material, float opacity);

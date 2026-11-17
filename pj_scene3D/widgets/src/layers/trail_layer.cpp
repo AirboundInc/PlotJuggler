@@ -12,8 +12,11 @@
 #include <QtConcurrent>
 #include <algorithm>
 #include <any>
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <limits>
+#include <numbers>
 #include <utility>
 
 #include "layer_xml_validation.h"
@@ -43,7 +46,63 @@ QString datasetSource(PJ::SessionManager& session, PJ::DatasetId dataset_id) {
   const PJ::DatasetInfo* info = session.dataEngine().getDataset(dataset_id);
   return info != nullptr ? QString::fromStdString(info->source_name) : QString();
 }
+
+// OKLCH (hue in radians) to 8-bit sRGB, clamped to the gamut (Björn Ottosson's OKLab matrices).
+QRgb oklchToRgb(double lightness, double chroma, double hue) {
+  const double a = chroma * std::cos(hue);
+  const double b = chroma * std::sin(hue);
+  const double l = std::pow(lightness + 0.3963377774 * a + 0.2158037573 * b, 3.0);
+  const double m = std::pow(lightness - 0.1055613458 * a - 0.0638541728 * b, 3.0);
+  const double s = std::pow(lightness - 0.0894841775 * a - 1.2914855480 * b, 3.0);
+  const auto encode = [](double linear) {
+    linear = std::clamp(linear, 0.0, 1.0);
+    const double srgb = linear <= 0.0031308 ? 12.92 * linear : 1.055 * std::pow(linear, 1.0 / 2.4) - 0.055;
+    return static_cast<int>(std::lround(255.0 * srgb));
+  };
+  return qRgb(encode(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+              encode(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+              encode(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s));
+}
 }  // namespace
+
+std::pair<QColor, QColor> defaultTrailColors(const QString& name, const std::vector<QColor>& taken) {
+  // Evenly spaced hues at one OKLCH lightness and chroma, so every neighbouring pair is the same
+  // perceptual distance apart. C = 0.11 is the largest chroma every hue reaches inside sRGB at
+  // L = 0.65 (more clips cyan/green and breaks the spacing). Hues start at OKLCH red.
+  constexpr double kLightness = 0.65;
+  constexpr double kChroma = 0.11;
+  constexpr double kFirstHueDeg = 29.0;
+  static const std::array<QRgb, 8> kPalette = [] {
+    std::array<QRgb, 8> palette{};
+    for (std::size_t k = 0; k < palette.size(); ++k) {
+      const double hue = (kFirstHueDeg + 360.0 * static_cast<double>(k) / palette.size()) * std::numbers::pi / 180.0;
+      palette[k] = oklchToRgb(kLightness, kChroma, hue);
+    }
+    return palette;
+  }();
+  // FNV-1a over the UTF-16 code units: unlike qHash, stable across Qt versions and processes.
+  uint32_t hash = 2166136261U;
+  for (const QChar ch : name) {
+    hash = (hash ^ ch.unicode()) * 16777619U;
+  }
+  const std::size_t start = hash % kPalette.size();
+  std::size_t slot = start;
+  for (std::size_t k = 0; k < kPalette.size(); ++k) {
+    const std::size_t candidate = (start + k) % kPalette.size();
+    const bool used = std::any_of(taken.begin(), taken.end(), [&](const QColor& c) {
+      return (c.rgb() & 0xFFFFFF) == (kPalette[candidate] & 0xFFFFFF);
+    });
+    if (!used) {
+      slot = candidate;
+      break;
+    }
+  }
+  const QColor past = QColor::fromRgb(kPalette[slot]);
+  constexpr double kTint = 0.55;  // share of white mixed into the future half
+  const auto tint = [](int channel) { return static_cast<int>(std::lround(channel + (255 - channel) * kTint)); };
+  const QColor future(tint(past.red()), tint(past.green()), tint(past.blue()));
+  return {past, future};
+}
 
 TrailLayer::TrailLayer(PJ::ObjectTopicId layer_id, TrailSource source, QObject* parent)
     : Scene3DLayer(parent), layer_id_(layer_id), source_(std::move(source)) {

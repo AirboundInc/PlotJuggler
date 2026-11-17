@@ -121,6 +121,12 @@ class TransformBuffer {
   // (real stamps are all > epoch); callers wanting only reachability should use
   // areConnected() instead.
   [[nodiscard]] std::optional<TimePoint> latestCommonTime(const std::string& target, const std::string& source) const;
+  // Oldest time at which every edge between the two frames has a sample: the first
+  // time the whole path resolves, which can be later than either frame's own first
+  // sample. Unlike latestCommonTime, single-sample edges DO bound it, since one
+  // resolves only at or after its stamp. nullopt if the frames are disconnected;
+  // TimePoint{} when target == source (an empty path).
+  [[nodiscard]] std::optional<TimePoint> earliestCommonTime(const std::string& target, const std::string& source) const;
 
   // Union of every edge's sample stamps along the connecting path between
   // `target` and `source` (both chains up to their common ancestor), clipped to
@@ -141,6 +147,8 @@ class TransformBuffer {
   void getAllFrames(std::vector<std::string>& out) const;
   [[nodiscard]] std::optional<std::string> getParent(const std::string& child) const;
   [[nodiscard]] std::optional<TimePoint> getLatestSample(const std::string& child) const;
+  // Oldest retained sample of `child`'s own edge (its parent chain may start later).
+  [[nodiscard]] std::optional<TimePoint> getEarliestSample(const std::string& child) const;
 
   // Depth-annotated DFS pre-order of the TF forest. Roots and same-parent
   // siblings are alphabetically sorted; cycle-safe via visited set. Frames inside

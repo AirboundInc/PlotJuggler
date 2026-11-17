@@ -147,6 +147,12 @@ TEST(MeshRenderPassTest, DrawNeedsVisualBlendingRouting) {
   EXPECT_TRUE(MeshRenderPass::drawNeedsVisualBlending(draw, false, 1.0f));
   draw.color.a = 1.0f;
   EXPECT_FALSE(MeshRenderPass::drawNeedsVisualBlending(draw, false, 1.0f));
+
+  // A draw that replaces the materials ignores the mesh's own kBlend material.
+  draw.replace_materials = true;
+  EXPECT_FALSE(MeshRenderPass::drawNeedsVisualBlending(draw, true, 1.0f));
+  draw.color.a = 0.5f;
+  EXPECT_TRUE(MeshRenderPass::drawNeedsVisualBlending(draw, true, 1.0f));
 }
 
 // --- Per-view shading plumbing (WP4: retired the process-global singleton) ----

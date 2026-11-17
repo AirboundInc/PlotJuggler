@@ -252,5 +252,32 @@ TEST(TrailLayerTest, EmptyTrailRevivesWhenTfDataArrives) {
   EXPECT_TRUE(layer.statusWarning().isEmpty());
 }
 
+TEST(TrailLayerTest, DefaultColorsAreStablePerNameAndAvoidTakenColors) {
+  const auto [past, future] = defaultTrailColors(u"vehicle"_s, {});
+  const auto again = defaultTrailColors(u"vehicle"_s, {});
+  EXPECT_EQ(past, again.first) << "a name must keep its colour";
+  EXPECT_EQ(future, again.second);
+  // The future half is a lighter tint of the past colour.
+  EXPECT_GT(future.lightness(), past.lightness());
+
+  // A second trail never repeats a colour already in the view, even on a hash collision.
+  const auto other = defaultTrailColors(u"vehicle"_s, {past});
+  EXPECT_NE(other.first, past);
+  std::vector<QColor> taken;
+  for (int k = 0; k < 8; ++k) {
+    const QColor next = defaultTrailColors(u"frame%1"_s.arg(k), taken).first;
+    EXPECT_TRUE(std::find(taken.begin(), taken.end(), next) == taken.end()) << "repeated at trail " << k;
+    taken.push_back(next);
+  }
+  // The palette has 8 colours: a ninth trail has to repeat one.
+  const QColor ninth = defaultTrailColors(u"frame8"_s, taken).first;
+  EXPECT_TRUE(std::find(taken.begin(), taken.end(), ninth) != taken.end());
+
+  // Equal OKLCH lightness and chroma, no neutral grey: every colour is clearly saturated.
+  for (const QColor& color : taken) {
+    EXPECT_GT(color.hsvSaturation(), 80) << color.name().toStdString();
+  }
+}
+
 }  // namespace
 }  // namespace pj::scene3d
