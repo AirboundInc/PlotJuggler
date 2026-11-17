@@ -21,6 +21,7 @@
 #include "pj_datastore/object_store.hpp"
 #include "pj_runtime/SessionManager.h"
 #include "pj_scene3d_widgets/Scene3DDockWidget.h"
+#include "pj_scene3d_widgets/scene3d_layer.h"
 #include "pj_scene3d_widgets/scene_view_widget.h"
 #include "pj_scene3d_widgets/transform_service.h"
 using namespace Qt::StringLiterals;
@@ -333,7 +334,10 @@ TEST(Scene3DDockCanonicalEntities, ManualFollowChoiceCancelsPendingModelFocus) {
   dock.setFollowFrame(u"world"_s);
   dock.setFollowFrame(QString());
 
-  pumpUntil([] { return false; }, 1000);  // let the mesh load land and any focus run
+  auto* layer = dynamic_cast<pj::scene3d::Scene3DLayer*>(dock.layerFor(model));
+  ASSERT_NE(layer, nullptr);
+  ASSERT_TRUE(pumpUntil([&] { return layer->modelFocus().has_value(); })) << "the model never loaded";
+  pumpUntil([] { return false; }, 100);  // deliver the focus retry the landed load queued
   EXPECT_TRUE(dock.currentFollowFrame().isEmpty()) << "the cancelled model focus still followed";
 }
 
