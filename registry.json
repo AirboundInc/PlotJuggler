@@ -2,6 +2,38 @@
   "registry_version": 1.0,
   "extensions": [
     {
+      "id": "ardupilot-bin-loader",
+      "name": "Ardupilot BIN Loader",
+      "version": "1.0.0",
+      "description": "Data loader for Ardupilot BIN files. Flight log format for Ardupilot.",
+      "author": "Ricky Wu",
+      "publisher": "Ricky Wu",
+      "website": "https://github.com/RickyWu18/plotjuggler-drone",
+      "repository": "https://github.com/RickyWu18/plotjuggler-drone",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "data_loader",
+      "tags": [
+        "file",
+        "loader",
+        "ardupilot",
+        "drone",
+        "flight"
+      ],
+      "min_plotjuggler_version": "4.0.0",
+      "min_sdk_required": "0.34.1",
+      "platforms": {
+        "linux-x86_64": {
+          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.0.0/ardupilot-bin-loader-1.0.0-linux-x86_64.zip",
+          "checksum": "sha256:75c88d36842699b00fd076c35a26fc668a36a4a9c8066f0582b6c9b1550740fc"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.0.0/ardupilot-bin-loader-1.0.0-windows-x64.zip",
+          "checksum": "sha256:558a4cd940360f445d5d5a6e706cc9f635b52adf8b769b9ac1602bb8c179fbab"
+        }
+      }
+    },
+    {
       "id": "ardupilot-dataflash",
       "name": "ArduPilot BIN (Contributed)",
       "version": "1.2.0-pj4.rc.1",
@@ -889,7 +921,7 @@
     {
       "id": "parquet-loader",
       "name": "Parquet Loader",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "description": "Data loader for Apache Parquet files. Efficient columnar storage format.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -909,24 +941,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.3/parquet-loader-1.0.3-linux-aarch64.zip",
-          "checksum": "sha256:af7c48b06d3fe27da9d7f0f889b6ba9b8752fd006c0aa86db3b42f02811f573a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.4/parquet-loader-1.0.4-linux-aarch64.zip",
+          "checksum": "sha256:3be6058234eb17ccd4f8db74125c1800d480ec804ac8d3cd496527450cb04277"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.3/parquet-loader-1.0.3-linux-x86_64.zip",
-          "checksum": "sha256:f2a4653076316fe31899a6c0eba101babe7c97780c2443265e8382f3f6fcbb1c"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.4/parquet-loader-1.0.4-linux-x86_64.zip",
+          "checksum": "sha256:a2dce9346437a37d0be22d7fa32dd591e5748b47bb93b881fe022bb45ef955eb"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.3/parquet-loader-1.0.3-macos-arm64.zip",
-          "checksum": "sha256:c879939560f70a27212b48d5cb47ab03b53a1c16fdeab6e546d03e0197a8b9ce"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.4/parquet-loader-1.0.4-macos-arm64.zip",
+          "checksum": "sha256:a2bbf6d6ffc8993254a27382831a7bd21dd7c0d06209f5d2342bea843657280c"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.3/parquet-loader-1.0.3-windows-arm64.zip",
-          "checksum": "sha256:097b2143d0f1871316594678fdd182d62349ba8a071d5e3cb2ac4b9fcf460549"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.4/parquet-loader-1.0.4-windows-arm64.zip",
+          "checksum": "sha256:9bae019cebdf0419e45116282aa74c5d226b2cfe410a873ae5e7be5c97199048"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.3/parquet-loader-1.0.3-windows-x64.zip",
-          "checksum": "sha256:7f61dec3abd510724115238d224fd3839df77eb2043b99d21677bee22221367a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_parquet/v1.0.4/parquet-loader-1.0.4-windows-x64.zip",
+          "checksum": "sha256:a0a06b289d6918c07359717f731897f5dcf6f45cf18a2ad5ed8b981bcb953a47"
         }
       }
     },
@@ -1069,7 +1101,7 @@
     {
       "id": "ros-parser",
       "name": "ROS CDR Parser",
-      "version": "1.4.0",
+      "version": "1.4.2",
       "description": "Decodes ROS 1 and ROS 2 messages, with definitions in .msg or IDL form, into plottable fields. Common sensor and visualization messages (images, point clouds, occupancy grids, grid maps, TF, markers, and yolo_msgs detections as image annotations) are shown in the 2D image and 3D scene views.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1093,24 +1125,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.0/ros-parser-1.4.0-linux-aarch64.zip",
-          "checksum": "sha256:7a7b651aae34365f115188d95007409d84a56f3f0eb876e3a9b7c9a598ba561d"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.2/ros-parser-1.4.2-linux-aarch64.zip",
+          "checksum": "sha256:357f8d94b3c4dc83a6d10d32fb036b021e7488bd0d4e30acef3972092a3dfb4d"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.0/ros-parser-1.4.0-linux-x86_64.zip",
-          "checksum": "sha256:bcd89eead44e2efb989894feff1e54852c9677ba6a639c06b5ccd96b88e1487c"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.2/ros-parser-1.4.2-linux-x86_64.zip",
+          "checksum": "sha256:44d5c7860da1bd3e76c7541f9ecd9ffa894ed5e4cb9a5b1f6d5dd4c3b7ea0279"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.0/ros-parser-1.4.0-macos-arm64.zip",
-          "checksum": "sha256:b816514d381eace97219057f9c0f6943918883131f63dbbaece8e045aaad29e9"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.2/ros-parser-1.4.2-macos-arm64.zip",
+          "checksum": "sha256:9e2c172399d424c4a654e502a5d9c7963cb3dbf131c1ea8a28dbda89e1c2aeda"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.0/ros-parser-1.4.0-windows-arm64.zip",
-          "checksum": "sha256:9a29552fb1dbbf9992998decc5a6fa358441c095271fa1b23d5eda201340d2f0"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.2/ros-parser-1.4.2-windows-arm64.zip",
+          "checksum": "sha256:2fbc24af2f02062dc1e909476f684f13507d53fda630cf6bfe95562bd326e093"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.0/ros-parser-1.4.0-windows-x64.zip",
-          "checksum": "sha256:282406a3aff63e9cf0e32933bcfbd6bff30a78c1d35c5615ed173dc4e847968c"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_ros/v1.4.2/ros-parser-1.4.2-windows-x64.zip",
+          "checksum": "sha256:570c590a0145acac3528a0c41f41e416a672bc98fffaf41d3e907ef1008bb4af"
         }
       }
     },
