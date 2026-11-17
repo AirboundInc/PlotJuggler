@@ -615,8 +615,7 @@ void Scene3DDockWidget::tryModelFocus() {
       ++it;
       continue;
     }
-    pending_focus_topics_.clear();
-    setFollowFrame(frame);
+    setFollowFrame(frame);  // also drops the other pending requests
     return;
   }
 }
@@ -1233,6 +1232,8 @@ QString Scene3DDockWidget::currentFollowFrame() const {
 }
 
 void Scene3DDockWidget::setFollowFrame(const QString& frame) {
+  // Any explicit choice, None included, overrides a model's pending auto-focus.
+  pending_focus_topics_.clear();
   if (view_ == nullptr || currentFollowFrame() == frame) {
     return;
   }
@@ -1332,6 +1333,7 @@ void Scene3DDockWidget::resetDatasetBindingForRestore() {
   dataset_id_ = 0;
   scene_topic_datasets_.clear();
   config_topics_.clear();
+  pending_focus_topics_.clear();
   available_frames_.clear();
   fallback_frames_.clear();
   orphan_states_.clear();

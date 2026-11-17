@@ -314,6 +314,29 @@ TEST(Scene3DDockCanonicalEntities, MarkersDroppedWhileModelLoadsKeepModelFocus) 
       << "the markers topic displaced the model's focus request";
 }
 
+// Choosing a follow frame while a dropped model loads, even switching back to None
+// before it lands, cancels the model's auto-focus.
+TEST(Scene3DDockCanonicalEntities, ManualFollowChoiceCancelsPendingModelFocus) {
+  PJ::SessionManager session;
+  pj::scene3d::TransformService transform_service(session);
+  PJ::ObjectStore& store = session.objectStore();
+  const PJ::ObjectTopicId tf = registerMovingTfTopic(store, "vehicle");
+  const PJ::ObjectTopicId model = registerInlineModelTopic(store, "vehicle", 100);
+  transform_service.ingestFrameTransformsForDataset(1);
+
+  PJ::Scene3DDockWidget dock;
+  dock.setSessionManager(&session);
+  dock.setTransformService(&transform_service);
+  ASSERT_TRUE(dock.addTopic(tf, PJ::sdk::BuiltinObjectType::kFrameTransforms, u"_TF"_s));
+  ASSERT_TRUE(dock.addTopic(model, PJ::sdk::BuiltinObjectType::kSceneEntities, u"_MODEL"_s));
+  ASSERT_TRUE(dock.currentFollowFrame().isEmpty()) << "the model's mesh loads asynchronously";
+  dock.setFollowFrame(u"world"_s);
+  dock.setFollowFrame(QString());
+
+  pumpUntil([] { return false; }, 1000);  // let the mesh load land and any focus run
+  EXPECT_TRUE(dock.currentFollowFrame().isEmpty()) << "the cancelled model focus still followed";
+}
+
 // A model on the fixed frame (terrain, a static map) has nothing to follow: the camera
 // and follow stay as they were.
 TEST(Scene3DDockCanonicalEntities, DroppedStaticModelDoesNotFollow) {

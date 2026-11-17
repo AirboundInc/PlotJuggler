@@ -576,5 +576,21 @@ TEST(TransformBufferTest, EarliestCommonTimeIsWhenTheWholePathStarts) {
   EXPECT_FALSE(buffer.earliestCommonTime("world", "unknown").has_value());
 }
 
+// A single-sample edge resolves only from its stamp on, so it bounds the earliest time.
+TEST(TransformBufferTest, EarliestCommonTimeCountsSingleSampleEdges) {
+  TransformBuffer mixed;
+  (void)mixed.setTransform(makeStamped("world", "odom", tp(100ns), makeTranslation(1.0)));
+  (void)mixed.setTransform(makeStamped("world", "odom", tp(300ns), makeTranslation(1.0)));
+  (void)mixed.setTransform(makeStamped("odom", "robot", tp(200ns), makeTranslation(2.0)));
+  EXPECT_EQ(mixed.earliestCommonTime("world", "robot"), tp(200ns));
+  EXPECT_TRUE(mixed.tryLookupTransform("world", "robot", tp(200ns)).has_value());
+
+  TransformBuffer single;
+  (void)single.setTransform(makeStamped("world", "odom", tp(150ns), makeTranslation(1.0)));
+  (void)single.setTransform(makeStamped("odom", "robot", tp(250ns), makeTranslation(2.0)));
+  EXPECT_EQ(single.earliestCommonTime("world", "robot"), tp(250ns));
+  EXPECT_TRUE(single.tryLookupTransform("world", "robot", tp(250ns)).has_value());
+}
+
 }  // namespace
 }  // namespace PJ

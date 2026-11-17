@@ -165,6 +165,7 @@ class Scene3DDockWidget : public SceneDockWidget {
   void setFixedFrameAutoRoot();
   // Set the camera follow target ("" = off). Forwards to the view and emits
   // followFrameChanged; persisted per-dock in the layout XML (next to fixed_frame).
+  // Cancels a dropped model's pending auto-focus, even when the frame is unchanged.
   void setFollowFrame(const QString& frame);
   // Recenter the camera on the current follow target (the "Follow frame" recenter
   // button). No-op when not following or the view does not exist.
@@ -380,7 +381,8 @@ class Scene3DDockWidget : public SceneDockWidget {
   /// Topics whose model the camera should focus on once it can (see tryModelFocus), in
   /// add order. Several can wait at once: a topic without a model (markers only) never
   /// resolves and must not displace a model still loading. Armed only by an interactive
-  /// add while the dock follows nothing.
+  /// add while the dock follows nothing; any setFollowFrame call or layout restore
+  /// cancels them all.
   std::vector<ObjectTopicId> pending_focus_topics_;
 };
 

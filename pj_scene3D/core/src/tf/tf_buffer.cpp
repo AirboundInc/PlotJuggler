@@ -308,11 +308,12 @@ std::optional<TimePoint> TransformBuffer::earliestCommonTime(const std::string& 
     return std::nullopt;
   }
 
-  // The path resolves once its latest-starting multi-sample edge has begun.
+  // The path resolves once its latest-starting edge has begun. A single-sample edge
+  // counts too: it holds forward from its stamp, never before it.
   auto walk = [](const std::vector<ChainHop>& chain, std::size_t k, std::optional<TimePoint>& acc) {
     for (std::size_t i = 0; i < k; ++i) {
       const auto& edge = chain[i].link->history;
-      if (edge.samples.size() <= 1) {
+      if (edge.samples.empty()) {
         continue;
       }
       const auto earliest = edge.samples.front().first;

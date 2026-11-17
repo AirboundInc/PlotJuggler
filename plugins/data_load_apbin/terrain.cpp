@@ -343,9 +343,14 @@ public:
     {
       return results;
     }
+    reporting_thread_ = std::this_thread::get_id();
     const auto fetch = [&](size_t k) {
       results[k] = get(source, tiles[k]);
       ++fetched_;
+      if (std::this_thread::get_id() == reporting_thread_)
+      {
+        report();  // no worker started: the caller fetches, so it must also notice a stop
+      }
     };
     run_reporting(1, [&] { fetch(0); });
     std::atomic<size_t> next{1};
@@ -437,6 +442,8 @@ private:
   std::atomic<int> fetched_{0};
   std::atomic<bool> stopped_{false};
   int total_tiles_ = 0;
+  // The thread on_tiles must run on: the one that called get_all.
+  std::thread::id reporting_thread_;
 };
 
 // Terrarium: height = R * 256 + G + B / 256 - 32768 metres above sea level.

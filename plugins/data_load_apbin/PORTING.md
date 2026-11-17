@@ -200,7 +200,8 @@ constant (472 335.072 s, ±256 ns double rounding).
     default `~/.cache/...`, on Linux). The first tile is fetched alone; if it gets no answer
     the rest use the cache only, so an offline load waits for one timeout. Only responses that
     are images (JPEG/PNG magic) are cached, so an error page served with a 200 is retried on the
-    next load rather than kept; a tile worker that cannot start leaves the work to the others.
+    next load rather than kept; a tile worker that cannot start leaves the work to the others (or, if none starts, to the
+    loading thread, which then checks for a cancel after every tile).
     `AIRBOUND_TERRAIN=0` skips terrain.
   - Checked on AA-TRT-0051: 130 imagery tiles (zoom 19), 2 elevation tiles (zoom 14), 2.7 MB GLB;
     first load 8.5 s (132 downloads), cached 81 ms. Vertically the terrain at the origin is

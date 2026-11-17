@@ -151,7 +151,9 @@ class SceneEntitiesLayer : public Scene3DLayer {
     return remote_fetch_notice_;
   }
   // The first entity with a model among the topic's first messages; starts its mesh
-  // loads under the same keys the replay uses, so the real entity reuses them.
+  // loads under the same keys the replay uses, so the real entity reuses them. nullopt
+  // until those loads land, always so in the call that starts them: retry on
+  // repaintRequested, which each landing load emits.
   [[nodiscard]] std::optional<ModelFocus> modelFocus() override;
 
  signals:

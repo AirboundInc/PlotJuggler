@@ -381,8 +381,17 @@ std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
     }
     PJ::ObjectStore& store = ctx_.session->objectStore();
     const auto binding = ctx_.session->parserBindingForObjectTopic(topic_id_);
-    const auto retained = store.rangeByTime(
-        topic_id_, std::numeric_limits<PJ::Timestamp>::min(), std::numeric_limits<PJ::Timestamp>::max());
+    // Only the oldest retained entries: at most kMaxScannedEntries of them were scanned
+    // already, so twice that many still holds every entry the scan can reach.
+    PJ::Timestamp last = 0;
+    {
+      const PJ::EntryTimestampsView stamps = store.entryTimestamps(topic_id_);
+      if (stamps.empty()) {
+        return std::nullopt;
+      }
+      last = stamps[std::min(stamps.size(), 2 * kMaxScannedEntries) - 1];
+    }
+    const auto retained = store.rangeByTime(topic_id_, std::numeric_limits<PJ::Timestamp>::min(), last);
     for (const auto& id : retained) {
       if (focus_entity_.has_value() || focus_scanned_uids_.size() >= kMaxScannedEntries) {
         break;
@@ -415,7 +424,8 @@ std::optional<Scene3DLayer::ModelFocus> SceneEntitiesLayer::modelFocus() {
   for (std::size_t i = 0; i < focus_entity_->models.size(); ++i) {
     startMeshLoadIfNeeded(meshKey(topic_id_, focus_entity_->id, i), focus_entity_->models[i]);
   }
-  pollMeshLoads();
+  // No pollMeshLoads() here: each load's watcher drains it and emits repaintRequested,
+  // which retries the focus, so a load never lands inside the call that started it.
   // An unloaded mesh measures as the placeholder cube, so wait for every load to land and
   // leave out the ones that failed.
   std::vector<MeshRenderPass::DrawCall> draws;
@@ -879,6 +889,7 @@ void SceneEntitiesLayer::startMeshLoadIfNeeded(const std::string& key, const PJ:
       target->fetch_failed = true;
       target->error = fetched.error;
       updateRemoteFetchNotice();
+      emit repaintRequested();  // a pending model focus waits on every load, failed ones too
       return;
     }
     startRecordImport(*target, fetched.bytes, hint);

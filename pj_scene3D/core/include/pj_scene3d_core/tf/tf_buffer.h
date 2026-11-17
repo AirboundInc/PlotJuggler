@@ -123,8 +123,9 @@ class TransformBuffer {
   [[nodiscard]] std::optional<TimePoint> latestCommonTime(const std::string& target, const std::string& source) const;
   // Oldest time at which every edge between the two frames has a sample: the first
   // time the whole path resolves, which can be later than either frame's own first
-  // sample. Same nullopt / single-sample / all-static TimePoint{} rules as
-  // latestCommonTime.
+  // sample. Unlike latestCommonTime, single-sample edges DO bound it, since one
+  // resolves only at or after its stamp. nullopt if the frames are disconnected;
+  // TimePoint{} when target == source (an empty path).
   [[nodiscard]] std::optional<TimePoint> earliestCommonTime(const std::string& target, const std::string& source) const;
 
   // Union of every edge's sample stamps along the connecting path between

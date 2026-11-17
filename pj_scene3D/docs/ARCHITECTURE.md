@@ -384,17 +384,18 @@ testable (`camera_near_far_test`, `camera_zoom_to_cursor_test`,
   `SceneEntitiesLayer`, the first entity with a model among the first 16 entries the
   layer sees (tracked by `SequentialUID`, so a streaming window's evictions do not hide
   new entries), measured in its own frame once its meshes have loaded (an unloaded mesh
-  would measure as the placeholder cube). The loads use the replay's mesh keys, so the
-  real entity reuses them; nothing is folded, so the playhead can be anywhere.
+  would measure as the placeholder cube; each load's watcher drains it, so the call that
+  starts a load never sees it land). The loads use the replay's mesh keys, so the real
+  entity reuses them; nothing is folded, so the playhead can be anywhere.
   `SceneViewWidget::focusOnFrameBounds` then centres the orbit on the box, placing the
   frame at the playhead or, before its path resolves, at
   `TransformBuffer::earliestCommonTime` (the first time every edge up to the fixed frame
-  has a sample),
+  has a sample, single-sample edges included),
   with radius 2.5x the box diagonal (and the diagonal as the top-down camera's
   half-height, which it frames by instead); the dock then follows that frame (seeding at
   first appearance keeps the camera on it). Retried on the layer's (queued)
-  `repaintRequested` and on TF readiness; dropped when the user picks a follow frame
-  first, the layer goes away, or the model's frame is the fixed frame (a static model:
+  `repaintRequested` and on TF readiness; dropped when any follow frame is chosen
+  first (None included) or a layout is restored, when the layer goes away, or the model's frame is the fixed frame (a static model:
   terrain, a map). Layout restore never arms it. Desktop only.
 - **Orbit about the clicked surface.** A left press (no Shift) reads one pixel of the
   resolved scene depth (`pickSurfaceAt`, `glGetTextureSubImage` on
