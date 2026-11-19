@@ -231,7 +231,7 @@
     {
       "id": "csv-loader",
       "name": "CSV Loader",
-      "version": "1.0.8",
+      "version": "1.0.10",
       "description": "Data loader for CSV files.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -249,24 +249,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.8/csv-loader-1.0.8-linux-aarch64.zip",
-          "checksum": "sha256:86cde5642e027a7d308d0e552a5d70fa5d453f1307b78b585b2254b045653172"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.10/csv-loader-1.0.10-linux-aarch64.zip",
+          "checksum": "sha256:e482f217d6588a3dea6282f97827105914ccc6e6cf45506ba43fbff44fd4c9ee"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.8/csv-loader-1.0.8-linux-x86_64.zip",
-          "checksum": "sha256:20a4bf1e7525b9683552acdcdd4a13834cf4e319d0ec17b30e12b3670b9465de"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.10/csv-loader-1.0.10-linux-x86_64.zip",
+          "checksum": "sha256:1c6385a82915a43615843169cf390f7467da7417a24a836dd631e75ad630ad66"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.8/csv-loader-1.0.8-macos-arm64.zip",
-          "checksum": "sha256:eaa781e5a85e7ee57edea85fab670b3595c96f5f741648bb6ac4823f3d165cc4"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.10/csv-loader-1.0.10-macos-arm64.zip",
+          "checksum": "sha256:a00debdb73a6d589036b719288829f75ebcfa2b59bfafb62e3af29fac8868c00"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.8/csv-loader-1.0.8-windows-arm64.zip",
-          "checksum": "sha256:7b16a86afe1756730be29dcdd902db195059f8abd9101f51064e5fa9cbe43a88"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.10/csv-loader-1.0.10-windows-arm64.zip",
+          "checksum": "sha256:a324d8c49a79eaea244726001711c55700b25f06a49bc62d648b3ad8045b3b4d"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.8/csv-loader-1.0.8-windows-x64.zip",
-          "checksum": "sha256:a510c5f80b09ecfe003bed0881b9feffb47b61bb46517e3a42e7dadc13ec43ee"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_csv/v1.0.10/csv-loader-1.0.10-windows-x64.zip",
+          "checksum": "sha256:ca916cf5c2eff8e3aeb12148bdee0af40bf393aa97095c0269643178c9718f3d"
         }
       }
     },
@@ -1247,6 +1247,50 @@
         "windows-x86_64": {
           "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.2.1/toolbox-anomaly-detector-0.2.1-windows-x64.zip",
           "checksum": "sha256:0d34a7ce8bdf28f0fb8692faf4230ff52b02d052a5c90f0c306dd7480fe06970"
+        }
+      }
+    },
+    {
+      "id": "toolbox-anomaly-detector",
+      "name": "Marker Editor",
+      "version": "0.3.1",
+      "description": "Write Lua rules that draw markers on your plots: shade regions (for example, color the background by a series' value), flag moments, draw value bands.",
+      "author": "PlotJuggler Team",
+      "publisher": "PlotJuggler",
+      "website": "https://github.com/PlotJuggler/pj-official-plugins",
+      "repository": "https://github.com/PlotJuggler/pj-official-plugins",
+      "license": "MIT",
+      "icon_url": "",
+      "category": "toolbox",
+      "tags": [
+        "lua",
+        "markers",
+        "anomaly",
+        "colormap",
+        "toolbox"
+      ],
+      "min_plotjuggler_version": "4.2.0",
+      "min_sdk_required": "1.0.0",
+      "platforms": {
+        "linux-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-linux-aarch64.zip",
+          "checksum": "sha256:3bdaddca97804ec1cde8d498910d8edd19a7946f6b48c8fec1e734eea576868f"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-linux-x86_64.zip",
+          "checksum": "sha256:f461c88897c9207f1cdf369a89a30e766475f96d3dad9eaa1beb59f7286304b4"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-macos-arm64.zip",
+          "checksum": "sha256:14aee1255eedd2d750d4e5416b8fcacbc38e34fe5e4d3658eb2b850a809d101e"
+        },
+        "windows-arm64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-windows-arm64.zip",
+          "checksum": "sha256:12e76638bd17d104af254ab75be2f8debe059550ab9d7c84ddfa93357367f715"
+        },
+        "windows-x86_64": {
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-windows-x64.zip",
+          "checksum": "sha256:126db0d185669173813763faaeac5398ea2a02966f61a917fd1435d20b031a6f"
         }
       }
     },
