@@ -711,7 +711,7 @@
     {
       "id": "mcap-loader",
       "name": "MCAP Loader",
-      "version": "1.3.2",
+      "version": "1.3.3",
       "description": "Data loader for MCAP files and split ROS 2 bags (metadata.yaml). Supports ROS1, ROS2, Protobuf, and JSON message encodings.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -734,24 +734,24 @@
       "floor_test": "McapDatasetMetadata.MetadataPublishDegradesCleanlyOnFloorLevelHost",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.2/mcap-loader-1.3.2-linux-aarch64.zip",
-          "checksum": "sha256:a161a4b1265911b28d9ab592b2eac17f44331de389a8255e578988708259abb2"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.3/mcap-loader-1.3.3-linux-aarch64.zip",
+          "checksum": "sha256:a19b686874fae3528589efb28b2c7fefbe9dd37c4c5571503dba40d207efc114"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.2/mcap-loader-1.3.2-linux-x86_64.zip",
-          "checksum": "sha256:e27b0a6e47f0b4e0ea86dfb100f5491cdc21038f6239e28f7f108b0c1bfafdfe"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.3/mcap-loader-1.3.3-linux-x86_64.zip",
+          "checksum": "sha256:8bc63ece7aa0d3d5994a0bad14005f7f19f31f170191b0abd54366525bc42499"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.2/mcap-loader-1.3.2-macos-arm64.zip",
-          "checksum": "sha256:4e80f1770e65f96ff7c6334cc49fe645da57a29b2053fcc7ae50a743f9e896b3"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.3/mcap-loader-1.3.3-macos-arm64.zip",
+          "checksum": "sha256:80cf78a920a92064217ff930d4d293c1d631a0ad4d8d76e8c2e8003e51b7b34e"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.2/mcap-loader-1.3.2-windows-arm64.zip",
-          "checksum": "sha256:dd97c87c49859951918831d61a05ddbf42d56f589fa0df0d010effa7df346e55"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.3/mcap-loader-1.3.3-windows-arm64.zip",
+          "checksum": "sha256:a4e9708b43470c374d26c5d8763342c2836eb6573fc30f1618946337bc766ace"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.2/mcap-loader-1.3.2-windows-x64.zip",
-          "checksum": "sha256:51e88040fe74bf780cb0a01872adedf114db7f03d0e817fa63e5cbe602e93823"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.3/mcap-loader-1.3.3-windows-x64.zip",
+          "checksum": "sha256:d0c262aec6aa582698747c6b555cce964ae4323bc830a7240b0330c231f2ee25"
         }
       }
     },
@@ -1356,7 +1356,7 @@
     {
       "id": "toolbox-anomaly-detector",
       "name": "Marker Editor",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "description": "Write Lua rules that draw markers on your plots: shade regions (for example, color the background by a series' value), flag moments, draw value bands.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1376,24 +1376,24 @@
       "min_sdk_required": "1.0.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-linux-aarch64.zip",
-          "checksum": "sha256:3bdaddca97804ec1cde8d498910d8edd19a7946f6b48c8fec1e734eea576868f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-linux-aarch64.zip",
+          "checksum": "sha256:d343f5fa5bf0e19338381e62ba3fef6e91756d71c9dedb850c3adcd5327987f0"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-linux-x86_64.zip",
-          "checksum": "sha256:f461c88897c9207f1cdf369a89a30e766475f96d3dad9eaa1beb59f7286304b4"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-linux-x86_64.zip",
+          "checksum": "sha256:5a1e2397566b42a39d0a2171e5dafb5b4b0968091a53919d451b1acc485e778b"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-macos-arm64.zip",
-          "checksum": "sha256:14aee1255eedd2d750d4e5416b8fcacbc38e34fe5e4d3658eb2b850a809d101e"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-macos-arm64.zip",
+          "checksum": "sha256:993319eec0c16c6e17ab9a59400b1d098579a0348a6c236be87a0893a9e58f7a"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-windows-arm64.zip",
-          "checksum": "sha256:12e76638bd17d104af254ab75be2f8debe059550ab9d7c84ddfa93357367f715"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-windows-arm64.zip",
+          "checksum": "sha256:b3f80be4145281c66fc51c3f3cb63b24b980336d9dca27051a52ab3e006dd70a"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.1/toolbox-anomaly-detector-0.3.1-windows-x64.zip",
-          "checksum": "sha256:126db0d185669173813763faaeac5398ea2a02966f61a917fd1435d20b031a6f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-windows-x64.zip",
+          "checksum": "sha256:ad648f2fd2c9c1cc39b4f2af9e73562088d6141f3fb69cf05f2dd3ec46aaf3a1"
         }
       }
     },
