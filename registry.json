@@ -1023,7 +1023,7 @@
     {
       "id": "plotjuggler-bridge",
       "name": "PlotJuggler Bridge",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "description": "Connect to PlotJuggler Bridge server for generic data streaming over WebSocket.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1042,28 +1042,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-linux-aarch64.zip",
-          "checksum": "sha256:d19c2c8bad2ae10a56c35e6058f3931c4a6373725ff699bd3be061a399d282fc"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.1/plotjuggler-bridge-1.2.1-linux-aarch64.zip",
+          "checksum": "sha256:57077bf850b912cbde02bbdfd90038c6426b772ecc07cf82e1de7608122ed9c7"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-linux-x86_64.zip",
-          "checksum": "sha256:72e5905814388919b31ea9398339e12b9aa98fd8fbc1cf49dab1cba48088d83b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.1/plotjuggler-bridge-1.2.1-linux-x86_64.zip",
+          "checksum": "sha256:79ad10547ab97a15c75b24bb8a97083d262844a4b8603e31931ab1180906b596"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-macos-arm64.zip",
-          "checksum": "sha256:cc76e4d03c470b131ab5a9de0fdb2f1674d61a51005ba067414f6b46648e9945"
-        },
-        "macos-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-macos-x86_64.zip",
-          "checksum": "sha256:4d60e494373b2def0c7ad27bdaf11635a7358bb04f24982785f81952c292c234"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.1/plotjuggler-bridge-1.2.1-macos-arm64.zip",
+          "checksum": "sha256:31b35e6c079a22afeaaad49b08b869528be6eb57422284e89607ef56c19b00b7"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-windows-arm64.zip",
-          "checksum": "sha256:3f5a7125fdc6df731d05e5d68b39e86d760f7cc053aa83eb40337c451a7c08cd"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.1/plotjuggler-bridge-1.2.1-windows-arm64.zip",
+          "checksum": "sha256:c9799cd3a908c03562164a28daa2989c12f2164b587c8af697a2fb437b5a60d3"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.0/plotjuggler-bridge-1.2.0-windows-x64.zip",
-          "checksum": "sha256:de34e84efa4b38415615edebc7ba33a0db5bd7f812d4adfee4fc9ca8368e4d88"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_stream_pj_bridge/v1.2.1/plotjuggler-bridge-1.2.1-windows-x64.zip",
+          "checksum": "sha256:9674e6e358eb0867d9e46df0f43f3820e8d2322b55bae326a5867dccfd267727"
         }
       }
     },
@@ -1113,9 +1109,9 @@
     },
     {
       "id": "pointcloud-3d-loader",
-      "name": "3D Loader (PLY/PCD)",
-      "version": "1.1.0",
-      "description": "Open static 3D files: .pcd files and vertex-only .ply files load as point clouds, .ply files with faces load as meshes. Each file is a single snapshot, not a time series.",
+      "name": "3D Loader (PLY/PCD/LAS)",
+      "version": "1.2.0",
+      "description": "Open static 3D files: .pcd files, LiDAR .las files and vertex-only .ply files load as point clouds, .ply files with faces load as meshes. Each file is a single snapshot, not a time series.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
       "website": "https://github.com/PlotJuggler/pj-official-plugins",
@@ -1126,6 +1122,8 @@
       "tags": [
         "ply",
         "pcd",
+        "las",
+        "lidar",
         "pointcloud",
         "mesh",
         "3d",
@@ -1135,24 +1133,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.1.0/pointcloud-3d-loader-1.1.0-linux-aarch64.zip",
-          "checksum": "sha256:ba8b24358563a51a2b0ace7a365f7c28a50e6580f2e775bd2616669ff9b37600"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-linux-aarch64.zip",
+          "checksum": "sha256:798ed0e05a52eb7cd3370424269335616e72ae6b07ea9201d997ba15982c9833"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.1.0/pointcloud-3d-loader-1.1.0-linux-x86_64.zip",
-          "checksum": "sha256:3e035010c727f4e569d1b80f651388f57b350b8888641f6c7d7f1c2b9a205936"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-linux-x86_64.zip",
+          "checksum": "sha256:1cc724898da5f16c8746f84bf9277511f41e6dfb0450cf5c39a87aabbeb32df9"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.1.0/pointcloud-3d-loader-1.1.0-macos-arm64.zip",
-          "checksum": "sha256:e99d0a7b5fd77bbc3181d78b3bac4b8573540521b6b7c3baa89fe11847e74be8"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-macos-arm64.zip",
+          "checksum": "sha256:708ce392243f4323c0eafc9dab5ccaace1931bf8f5ade67bd6cf2813a7472631"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.1.0/pointcloud-3d-loader-1.1.0-windows-arm64.zip",
-          "checksum": "sha256:e250655a2fc2438da566244b9e68cf8290ff094e842299ddac09996188472f7d"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-windows-arm64.zip",
+          "checksum": "sha256:a34c67401136e3815f91c586fbf45925cd18475b1e03b061c4f9e1b450111f02"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.1.0/pointcloud-3d-loader-1.1.0-windows-x64.zip",
-          "checksum": "sha256:20fa87419982713ef340347870531bc8ee42162bd9ec2526daf8abdda226756d"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-windows-x64.zip",
+          "checksum": "sha256:87d2bdecce1158e92d9f07ac83b057a0f4a6a4ac4339622abe0fe80947b7dd0f"
         }
       }
     },
