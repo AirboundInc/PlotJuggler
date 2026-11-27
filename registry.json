@@ -4,7 +4,7 @@
     {
       "id": "ardupilot-bin-loader",
       "name": "Ardupilot BIN Loader",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "description": "Data loader for Ardupilot BIN files. Flight log format for Ardupilot.",
       "author": "Ricky Wu",
       "publisher": "Ricky Wu",
@@ -24,12 +24,12 @@
       "min_sdk_required": "0.34.1",
       "platforms": {
         "linux-x86_64": {
-          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.0.0/ardupilot-bin-loader-1.0.0-linux-x86_64.zip",
-          "checksum": "sha256:75c88d36842699b00fd076c35a26fc668a36a4a9c8066f0582b6c9b1550740fc"
+          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.2.0/ardupilot-bin-loader-1.2.0-linux-x86_64.zip",
+          "checksum": "sha256:ea044198ca23b7db5a5a6b96e126cd88302be05888b27416792c570248b59092"
         },
         "windows-x86_64": {
-          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.0.0/ardupilot-bin-loader-1.0.0-windows-x64.zip",
-          "checksum": "sha256:558a4cd940360f445d5d5a6e706cc9f635b52adf8b769b9ac1602bb8c179fbab"
+          "url": "https://github.com/RickyWu18/plotjuggler-drone/releases/download/data_load_ardupilot/v1.2.0/ardupilot-bin-loader-1.2.0-windows-x64.zip",
+          "checksum": "sha256:19718dffa24050833dc59eb49993c82fc933eb0ae6cde8430ec752d1a2e59200"
         }
       }
     },
@@ -141,7 +141,7 @@
     {
       "id": "blf-loader",
       "name": "BLF Loader",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "description": "Data loader for Vector BLF (Binary Logging Format) CAN logs, decoded to signals via DBC.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -162,31 +162,31 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.6/blf-loader-0.1.6-linux-aarch64.zip",
-          "checksum": "sha256:05da4d4191796d707091e4322f2d718e76bd3989d4e34a5c59ee0273e07b1886"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.7/blf-loader-0.1.7-linux-aarch64.zip",
+          "checksum": "sha256:de07e65754a23ad137ecf8430b2bff7293b5f8d36702ef39e61ebc3b7f44fcd2"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.6/blf-loader-0.1.6-linux-x86_64.zip",
-          "checksum": "sha256:9230669c8ada13aa98d0594a97815c5553df5ef29390d796df64288b2a3707fd"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.7/blf-loader-0.1.7-linux-x86_64.zip",
+          "checksum": "sha256:56c5fdc908ce5a63678ef742a33c3055ce1b20b974a5da7dd858c633b72542dd"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.6/blf-loader-0.1.6-macos-arm64.zip",
-          "checksum": "sha256:1315022197dccdc48438676053972df219356473123a66ffae09b992540cd55a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.7/blf-loader-0.1.7-macos-arm64.zip",
+          "checksum": "sha256:063fcffec7b19baa1a55b57832acba772dc7d4601989f211aabe70236fb2b008"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.6/blf-loader-0.1.6-windows-arm64.zip",
-          "checksum": "sha256:752118a1caa163c9aab64c6e19c30ebfa4e28e09669e3d803c5658a083d8d3a8"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.7/blf-loader-0.1.7-windows-arm64.zip",
+          "checksum": "sha256:b8693e9bf8657c713ba1f5be4c17460c13bca29b0c77a390064a342b44e62536"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.6/blf-loader-0.1.6-windows-x64.zip",
-          "checksum": "sha256:1f7a653a7a82349bd748f3cf0f3160190eec8af34a6f884d0883913fe80ce256"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_blf/v0.1.7/blf-loader-0.1.7-windows-x64.zip",
+          "checksum": "sha256:37de09c61d7f2451ea3d463ee527312123b43d50e479aa83cd1f4d03afbe0a79"
         }
       }
     },
     {
       "id": "candump-loader",
       "name": "candump Loader",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "description": "Data loader for Linux SocketCAN candump captures (log and screen format), decoded to signals via DBC or an ARUS-style CSV dictionary.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -203,28 +203,28 @@
         "file",
         "loader"
       ],
-      "min_plotjuggler_version": "4.0.0",
+      "min_plotjuggler_version": "4.2.0",
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.1.2/candump-loader-0.1.2-linux-aarch64.zip",
-          "checksum": "sha256:739f2412786b0223ddd9559041c9a3d0ec33bf4f3c2aedfc1a100fd24952089e"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.2.0/candump-loader-0.2.0-linux-aarch64.zip",
+          "checksum": "sha256:116c2830d1ccab09b0e1f452d6f7c7e653bbf59dd23afee46dee882bcc462762"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.1.2/candump-loader-0.1.2-linux-x86_64.zip",
-          "checksum": "sha256:5c8b4c41184bcab5bc4ab420922848655da2cbc3b6848f7b88efaf8d068135c3"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.2.0/candump-loader-0.2.0-linux-x86_64.zip",
+          "checksum": "sha256:95ca4ebe3690fd8d232b0c98757f888070a6e94406d247298c38e88ab1c44106"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.1.2/candump-loader-0.1.2-macos-arm64.zip",
-          "checksum": "sha256:253b9a8fa7c51133f4c2f71cf6501d571ec19a5860c130ca195da25bfd2eda95"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.2.0/candump-loader-0.2.0-macos-arm64.zip",
+          "checksum": "sha256:9970c05e20bf3699cf23000b21e98be434b17478c172ec93a7f1a7e7aa96ed31"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.1.2/candump-loader-0.1.2-windows-arm64.zip",
-          "checksum": "sha256:dcd06f8f28a12516900c1076bd80a55de0b6a5938465d1f81b72314d6542d86e"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.2.0/candump-loader-0.2.0-windows-arm64.zip",
+          "checksum": "sha256:f12a7798edba97a6b70862903937e50c3de08fa4264cd238189eee5f7fdff42d"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.1.2/candump-loader-0.1.2-windows-x64.zip",
-          "checksum": "sha256:89fb3bbf17e74b8914763e86379960bb600152c7e04f2889564228c3440a33f5"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_candump/v0.2.0/candump-loader-0.2.0-windows-x64.zip",
+          "checksum": "sha256:7235a0682d44c6ff3b745262cfa7ef0be0ad79e9c4e23abc69b3a7ba7245eace"
         }
       }
     },
@@ -578,7 +578,7 @@
     {
       "id": "lerobot-loader",
       "name": "LeRobot Loader",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "description": "Open LeRobot datasets (v2.x and v3.0) by choosing the dataset's meta/info.json, then pick which episodes to load. The numeric series (state, action, ...) are plotted and each camera's video plays on the same timeline.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -598,24 +598,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.4/lerobot-loader-1.0.4-linux-aarch64.zip",
-          "checksum": "sha256:1939c62f1bf4c06fb0ee817009bf4187ba51387b1ffb84241306a15449898aa7"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.5/lerobot-loader-1.0.5-linux-aarch64.zip",
+          "checksum": "sha256:bc964d106d48e52aee60340bd072d7ee286d930fc97856de7980e9273088052f"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.4/lerobot-loader-1.0.4-linux-x86_64.zip",
-          "checksum": "sha256:d065f4e4ce0319b6e40e189351873b8796b24606caa58b07cd7b2308dd912c10"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.5/lerobot-loader-1.0.5-linux-x86_64.zip",
+          "checksum": "sha256:98695cad49c745d6d103e0bd4032d59c23ea4d0bfa5df1464b1b904d78fb610e"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.4/lerobot-loader-1.0.4-macos-arm64.zip",
-          "checksum": "sha256:484437cb1ab8c547df2b0f724263dbf618b61a69f5009f4600fe7459916431f0"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.5/lerobot-loader-1.0.5-macos-arm64.zip",
+          "checksum": "sha256:35c32bae443b97e8e9cc8c04beee11161c86b9a45f0e0dae0bf1792b7a69d921"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.4/lerobot-loader-1.0.4-windows-arm64.zip",
-          "checksum": "sha256:cd786a3d008ef62039191ee1727acd351d534fb151505260baf560ddd5e2e253"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.5/lerobot-loader-1.0.5-windows-arm64.zip",
+          "checksum": "sha256:de4713734820353e9221cb021711a14973428002bc9cdf7b1ba61feb9248ef55"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.4/lerobot-loader-1.0.4-windows-x64.zip",
-          "checksum": "sha256:50318be47ae91cfa12e01c099caba12f089189277c975c58af1c7d7d9de87904"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_lerobot/v1.0.5/lerobot-loader-1.0.5-windows-x64.zip",
+          "checksum": "sha256:dcf13562417da175ffa979ee922a0a6a69d91c54ea8560dbb33fa4864938f2fd"
         }
       }
     },
@@ -711,7 +711,7 @@
     {
       "id": "mcap-loader",
       "name": "MCAP Loader",
-      "version": "1.3.4",
+      "version": "1.3.6",
       "description": "Data loader for MCAP files and split ROS 2 bags (metadata.yaml). Supports ROS1, ROS2, Protobuf, and JSON message encodings.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -728,37 +728,37 @@
         "ros2",
         "protobuf"
       ],
-      "min_plotjuggler_version": "4.0.0",
+      "min_plotjuggler_version": "4.2.0",
       "min_sdk_required": "0.28.0",
       "suggested_sdk_version": "0.32.0",
       "floor_test": "McapDatasetMetadata.MetadataPublishDegradesCleanlyOnFloorLevelHost",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.4/mcap-loader-1.3.4-linux-aarch64.zip",
-          "checksum": "sha256:3e89da92cec84480eda47370a8cd9733a9fa50c87833a113c76f688cf37bfc3b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.6/mcap-loader-1.3.6-linux-aarch64.zip",
+          "checksum": "sha256:3c6a26884c666f54d44eb2d796edc5922a93f87dc0d4b7a2941ab316244d8a8c"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.4/mcap-loader-1.3.4-linux-x86_64.zip",
-          "checksum": "sha256:b15b01aae2813ee626b4914cfacedcde357b8f7305bb76e4ffdab3655bbf3e54"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.6/mcap-loader-1.3.6-linux-x86_64.zip",
+          "checksum": "sha256:91b2adf7a7a602976f4fc62d54e5160efc9382c1725b7e71fcea3d4ec61d55d2"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.4/mcap-loader-1.3.4-macos-arm64.zip",
-          "checksum": "sha256:8e3d5221baaaad204758f14803044442e8f6a943e912f1593001c126ab76f5c4"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.6/mcap-loader-1.3.6-macos-arm64.zip",
+          "checksum": "sha256:75a3e7260fd07454f5358a58a062ab27159a1f816240f464a1f3aeec684e750a"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.4/mcap-loader-1.3.4-windows-arm64.zip",
-          "checksum": "sha256:3ee4492c6832029d199070da21f9f5b1371eb2b315b59f15e1f1ed77319b883b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.6/mcap-loader-1.3.6-windows-arm64.zip",
+          "checksum": "sha256:1690ceef2b71f8487bb2fb887a68b29fcbfc7772d6bca37da53740fa6929d672"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.4/mcap-loader-1.3.4-windows-x64.zip",
-          "checksum": "sha256:7c2b17e6b10f6d699cf00308c81a6d01d940cd5997880c4daa463510e80c2661"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mcap/v1.3.6/mcap-loader-1.3.6-windows-x64.zip",
+          "checksum": "sha256:e34bf5c49203b03ef6ce5969050848c4c33cec75e9bcf523f7b002c60d2e6f16"
         }
       }
     },
     {
       "id": "mf4-loader",
       "name": "MF4/MDF Loader",
-      "version": "0.1.5",
+      "version": "0.2.0",
       "description": "Data loader for ASAM MDF / MF4 measurement files (automotive, CAN/LIN bus logging).",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -780,31 +780,31 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.5/mf4-loader-0.1.5-linux-aarch64.zip",
-          "checksum": "sha256:65227d993713cf6cc4d376f02e6e96deb9016a9c2ce3c0670f602b24da6a576b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.2.0/mf4-loader-0.2.0-linux-aarch64.zip",
+          "checksum": "sha256:1d7dd103944817d545df4a8864dc6a33811597eca4ceff135d71549cc196c9ff"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.5/mf4-loader-0.1.5-linux-x86_64.zip",
-          "checksum": "sha256:56dfd78c215202e39fe3c3aef4445f697318a07d9f40c3a4bcde28969610d38a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.2.0/mf4-loader-0.2.0-linux-x86_64.zip",
+          "checksum": "sha256:211e34cf401af17a30203e266981e8d85d07f56a3ee43dd607438f8405482239"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.5/mf4-loader-0.1.5-macos-arm64.zip",
-          "checksum": "sha256:9f4502002817ff56b51fac58884686af74ef7843d1d9604bca97d03788ba4e0e"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.2.0/mf4-loader-0.2.0-macos-arm64.zip",
+          "checksum": "sha256:856d8822ba06c32958712465dd3262f6c923fd13e467b322d7171e02a8e2ca5e"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.5/mf4-loader-0.1.5-windows-arm64.zip",
-          "checksum": "sha256:2002c97b7474760e7ea50a6e9e5c4d09ce1c6579ea6f059f51fed8cf32e3ea90"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.2.0/mf4-loader-0.2.0-windows-arm64.zip",
+          "checksum": "sha256:39d96e61b889cd974b3007864f4296dec88e8e8b433864650082520553ab6f28"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.1.5/mf4-loader-0.1.5-windows-x64.zip",
-          "checksum": "sha256:4e74d2d94a2ae296b220eaad54f995a73005682759229e825c1481eb5ef7787f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mf4/v0.2.0/mf4-loader-0.2.0-windows-x64.zip",
+          "checksum": "sha256:33f6545c21305be6878fca9045308309771d817c4d0c355fa5a73959b782805d"
         }
       }
     },
     {
       "id": "mp4-loader",
       "name": "MP4 Loader",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "description": "Open .mp4 video files and play them in sync with your plots. When a file records its creation time, the video is placed at that wall-clock time; several files can be opened at once.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -822,24 +822,24 @@
       "min_sdk_required": "0.31.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.1/mp4-loader-0.10.1-linux-aarch64.zip",
-          "checksum": "sha256:870fc5a75e84bb3309dbf7071e8ccd950c4cf210c6b58307e1f1f69864983afc"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.2/mp4-loader-0.10.2-linux-aarch64.zip",
+          "checksum": "sha256:abb00e213581b621056de0673cc2ef75056f3ff9040b90b9ec8e4ac1a2aff93a"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.1/mp4-loader-0.10.1-linux-x86_64.zip",
-          "checksum": "sha256:634c7be698a21247b707b8dffcd9e1d093af2c65b85a109d5acf1883b6be2963"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.2/mp4-loader-0.10.2-linux-x86_64.zip",
+          "checksum": "sha256:a53e79ee6d45eb6635f18721205887b96f8162d3d6496a6333506ac2637c07d9"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.1/mp4-loader-0.10.1-macos-arm64.zip",
-          "checksum": "sha256:56f3b4405832a358e985327b1f5d3430226e08e8b0f133eccea20e40d0845ced"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.2/mp4-loader-0.10.2-macos-arm64.zip",
+          "checksum": "sha256:5c2767d483293f24c8d3173372dc75c8d4c541276420e9a33665b101de50b4cc"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.1/mp4-loader-0.10.1-windows-arm64.zip",
-          "checksum": "sha256:835ff3f93c798c7b57c0d4d1274d07dbfb5b0c92848259fe1fbfd2fd2571165e"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.2/mp4-loader-0.10.2-windows-arm64.zip",
+          "checksum": "sha256:4278fcf6fb5aae8ec5434f598fc7e39829f27fe9365dd5a8f74d5d8f4c78be53"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.1/mp4-loader-0.10.1-windows-x64.zip",
-          "checksum": "sha256:65aaeb20502bf1a02564963bd62c87358b507e39fde5f34165dba64f5d20d5c1"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_mp4/v0.10.2/mp4-loader-0.10.2-windows-x64.zip",
+          "checksum": "sha256:aa0f1883b9b16387a3bcd84a0f693bec70f49bcbd23c9be0993b02c093b58f9e"
         }
       }
     },
@@ -1110,7 +1110,7 @@
     {
       "id": "pointcloud-3d-loader",
       "name": "3D Loader (PLY/PCD/LAS)",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "description": "Open static 3D files: .pcd files, LiDAR .las files and vertex-only .ply files load as point clouds, .ply files with faces load as meshes. Each file is a single snapshot, not a time series.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1133,31 +1133,31 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-linux-aarch64.zip",
-          "checksum": "sha256:798ed0e05a52eb7cd3370424269335616e72ae6b07ea9201d997ba15982c9833"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.1/pointcloud-3d-loader-1.2.1-linux-aarch64.zip",
+          "checksum": "sha256:1a3e495f9458911011901f76d93febb22ab51faff11d0e1c9cd22a65b8643fc1"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-linux-x86_64.zip",
-          "checksum": "sha256:1cc724898da5f16c8746f84bf9277511f41e6dfb0450cf5c39a87aabbeb32df9"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.1/pointcloud-3d-loader-1.2.1-linux-x86_64.zip",
+          "checksum": "sha256:27190932d31bf89c6808781d2a1d58372b2f0d6e8a497dfc024c0302fc22fbf3"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-macos-arm64.zip",
-          "checksum": "sha256:708ce392243f4323c0eafc9dab5ccaace1931bf8f5ade67bd6cf2813a7472631"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.1/pointcloud-3d-loader-1.2.1-macos-arm64.zip",
+          "checksum": "sha256:27698c57307f6cca5710b6c2091ff538389adfa4f2dd8d8dccab4fd1692543b9"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-windows-arm64.zip",
-          "checksum": "sha256:a34c67401136e3815f91c586fbf45925cd18475b1e03b061c4f9e1b450111f02"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.1/pointcloud-3d-loader-1.2.1-windows-arm64.zip",
+          "checksum": "sha256:6152c9dc9ca9733059e47c513a8662434342eab3be0d5239bf9c4972f034b984"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.0/pointcloud-3d-loader-1.2.0-windows-x64.zip",
-          "checksum": "sha256:87d2bdecce1158e92d9f07ac83b057a0f4a6a4ac4339622abe0fe80947b7dd0f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/data_load_3d/v1.2.1/pointcloud-3d-loader-1.2.1-windows-x64.zip",
+          "checksum": "sha256:3f646046a55d124e01f9f9005954abfb73d78955a54e2ef2dd69e771fa6cdcea"
         }
       }
     },
     {
       "id": "protobuf-parser",
       "name": "Protobuf Parser",
-      "version": "1.3.1",
+      "version": "1.3.2",
       "description": "Decodes Protocol Buffers messages into plottable fields. Standard Foxglove message types (point clouds, images and compressed video, image annotations, scene entities, transforms, poses, camera calibration, voxel grids and grids) are shown in the 2D image and 3D scene views.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1182,24 +1182,24 @@
       "min_sdk_required": "0.28.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.1/protobuf-parser-1.3.1-linux-aarch64.zip",
-          "checksum": "sha256:ef3749bdb2f419a1bd360821fc7ff3cf121a1d68ee73242c125d2da754a1d941"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.2/protobuf-parser-1.3.2-linux-aarch64.zip",
+          "checksum": "sha256:12658520d05c386be0962183dae797199caffc888cd02644cf0a8183d0e35661"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.1/protobuf-parser-1.3.1-linux-x86_64.zip",
-          "checksum": "sha256:c4f891c03892cab68001131eb679f5c3047920a7920bb269a39e89eed30c0341"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.2/protobuf-parser-1.3.2-linux-x86_64.zip",
+          "checksum": "sha256:16f144a77b58ae250ada10eb33e43a1f3112235e5e1a198e5d190295b2417487"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.1/protobuf-parser-1.3.1-macos-arm64.zip",
-          "checksum": "sha256:5335486dc7a44e93d8fd4c7d0a784018b95da12e4279e28cb1b720374105a744"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.2/protobuf-parser-1.3.2-macos-arm64.zip",
+          "checksum": "sha256:cee05391b1f4bc2b425c42ed8c7276d5b6bea5c9c7fa32563639182bd4058f9d"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.1/protobuf-parser-1.3.1-windows-arm64.zip",
-          "checksum": "sha256:b3c28643097df4ecaf7beaf53638f103cfa4d1f7ba950561b33bacaddf6ca855"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.2/protobuf-parser-1.3.2-windows-arm64.zip",
+          "checksum": "sha256:d5aa69ef317867aec6289a0cd05b4f0b62dffbec50728d50af69eb9d099fc3b7"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.1/protobuf-parser-1.3.1-windows-x64.zip",
-          "checksum": "sha256:47dbde51e29176cdf62a8e678851382af144bb848f3a2ead714a511488afb1eb"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/parser_protobuf/v1.3.2/protobuf-parser-1.3.2-windows-x64.zip",
+          "checksum": "sha256:34b274d1836e52be518562123496a15485d420b29e880225acafd60d448d4c16"
         }
       }
     },
@@ -1358,7 +1358,7 @@
     {
       "id": "toolbox-anomaly-detector",
       "name": "Marker Editor",
-      "version": "0.3.2",
+      "version": "0.3.3",
       "description": "Write Lua rules that draw markers on your plots: shade regions (for example, color the background by a series' value), flag moments, draw value bands.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1378,24 +1378,24 @@
       "min_sdk_required": "1.0.0",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-linux-aarch64.zip",
-          "checksum": "sha256:d343f5fa5bf0e19338381e62ba3fef6e91756d71c9dedb850c3adcd5327987f0"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.3/toolbox-anomaly-detector-0.3.3-linux-aarch64.zip",
+          "checksum": "sha256:4b499ac7ddf992a075e9bf63c6e9c5439b19b13305bbf0ec3b5843d8560869e4"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-linux-x86_64.zip",
-          "checksum": "sha256:5a1e2397566b42a39d0a2171e5dafb5b4b0968091a53919d451b1acc485e778b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.3/toolbox-anomaly-detector-0.3.3-linux-x86_64.zip",
+          "checksum": "sha256:50c581e7e9ff3a2fac60e3be0938b6ac4581f877c6403b7aecfd446fa86aaf58"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-macos-arm64.zip",
-          "checksum": "sha256:993319eec0c16c6e17ab9a59400b1d098579a0348a6c236be87a0893a9e58f7a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.3/toolbox-anomaly-detector-0.3.3-macos-arm64.zip",
+          "checksum": "sha256:b73ba2508440670edb42b225ba0e4f825b368b8798913a2b5f1a8f275e6eb2a0"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-windows-arm64.zip",
-          "checksum": "sha256:b3f80be4145281c66fc51c3f3cb63b24b980336d9dca27051a52ab3e006dd70a"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.3/toolbox-anomaly-detector-0.3.3-windows-arm64.zip",
+          "checksum": "sha256:698f33dfa7e33d0dcedb52c5a9ee8c30559277b504e4011a3e7dcdda3e18d731"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.2/toolbox-anomaly-detector-0.3.2-windows-x64.zip",
-          "checksum": "sha256:ad648f2fd2c9c1cc39b4f2af9e73562088d6141f3fb69cf05f2dd3ec46aaf3a1"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_anomaly_detector/v0.3.3/toolbox-anomaly-detector-0.3.3-windows-x64.zip",
+          "checksum": "sha256:0b4f17e4a4d674be584e40b56a76cbb124bf3e3bff7c28885453d5eccfb950f2"
         }
       }
     },
@@ -1578,7 +1578,7 @@
     {
       "id": "toolbox-mosaico",
       "name": "Mosaico Cloud Server",
-      "version": "1.3.1",
+      "version": "1.3.2",
       "description": "Browse Mosaico cloud servers and import their data: filter by metadata with Lua expressions, choose a time range, and stream several topics at once. Install the Arrow IPC Parser alongside it to decode scalar topics.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1598,20 +1598,20 @@
       "entry_point": "Sources panel → Cloud → Mosaico Cloud Server → + (Open cloud browser)",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.1/toolbox-mosaico-1.3.1-linux-aarch64.zip",
-          "checksum": "sha256:cba415752d5797b50bd28bbb79a481be4fe0ec2cfa15ad50f42610638e3ba63b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.2/toolbox-mosaico-1.3.2-linux-aarch64.zip",
+          "checksum": "sha256:5f2296205613b83dca3c54bcdb89d933140a86e3c24cdb2fd4e03f659fae9fe4"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.1/toolbox-mosaico-1.3.1-linux-x86_64.zip",
-          "checksum": "sha256:8760eba916c05b344d1dd400409fbe13188daf4190010472f1283a0373f334a2"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.2/toolbox-mosaico-1.3.2-linux-x86_64.zip",
+          "checksum": "sha256:9c35653e7d0ca321997659448b3759a011728b72514978170cfdd6e1b5568666"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.1/toolbox-mosaico-1.3.1-macos-arm64.zip",
-          "checksum": "sha256:292d507f0ac9f1be8cba65562c3c931a31315eb053ea5459388732460d477a04"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.2/toolbox-mosaico-1.3.2-macos-arm64.zip",
+          "checksum": "sha256:94e6bc410ee53e2a170e53d060d82be46880ca05e8422da4a05f583d35bd4631"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.1/toolbox-mosaico-1.3.1-windows-x64.zip",
-          "checksum": "sha256:26cc171fab18ca5445c0693bc99d3b8309d4baa14361018859c65920457012c2"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_mosaico/v1.3.2/toolbox-mosaico-1.3.2-windows-x64.zip",
+          "checksum": "sha256:e48582aaa7fa11abdd9109e820d894c8a12e94af66e091acc5e8b9603b690302"
         }
       }
     },
@@ -1703,7 +1703,7 @@
     {
       "id": "toolbox-transform-editor",
       "name": "Transform Editor",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "description": "Create derived time series and 2D/3D objects from series and object topics with Luau or Python functions: drop the inputs, write the function, preview the result and create it. The successor of the Custom Series editor of PJ3.",
       "author": "PlotJuggler Team",
       "publisher": "PlotJuggler",
@@ -1728,24 +1728,24 @@
       "entry_point": "Custom Topics panel → + (Add custom topic)",
       "platforms": {
         "linux-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.0/toolbox-transform-editor-1.3.0-linux-aarch64.zip",
-          "checksum": "sha256:b63ae59bab38b2a994ec3483018ea629127ac252bbf5d778652688b29f8a8cd8"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.1/toolbox-transform-editor-1.3.1-linux-aarch64.zip",
+          "checksum": "sha256:a52c017173f7d034cc710fab61818cd0983cbae1671e189f92063a90bc6204ec"
         },
         "linux-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.0/toolbox-transform-editor-1.3.0-linux-x86_64.zip",
-          "checksum": "sha256:a5377e77ed36cf195d62d6d66ade4ae736bb7a414492cfea2850c53940aa633f"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.1/toolbox-transform-editor-1.3.1-linux-x86_64.zip",
+          "checksum": "sha256:381de88a7512a69e40b3af51ebc7693ee94abf5e665b571320a4b10922b41ca0"
         },
         "macos-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.0/toolbox-transform-editor-1.3.0-macos-arm64.zip",
-          "checksum": "sha256:848725bd420b50073f63ee5726a06e854258442bbd502f950f708e521f2b413d"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.1/toolbox-transform-editor-1.3.1-macos-arm64.zip",
+          "checksum": "sha256:bf55614c2f88d6b895fccc37819de1995f6c728f5edfc8843c4e03076e01cc98"
         },
         "windows-arm64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.0/toolbox-transform-editor-1.3.0-windows-arm64.zip",
-          "checksum": "sha256:4f2a52988b72b2ddb6b86da1ea6781da1d5b29b52263fdb2695e254fc960519b"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.1/toolbox-transform-editor-1.3.1-windows-arm64.zip",
+          "checksum": "sha256:2ae8708d4c5664529f4fd36b26181124f138bd620de748f89269d78cdd52b526"
         },
         "windows-x86_64": {
-          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.0/toolbox-transform-editor-1.3.0-windows-x64.zip",
-          "checksum": "sha256:eb046b8e1e98e82be1759435f4b0e3fc49f0a6e72de2bbe3b1f763bb5502bc28"
+          "url": "https://github.com/PlotJuggler/pj-official-plugins/releases/download/toolbox_transform_editor/v1.3.1/toolbox-transform-editor-1.3.1-windows-x64.zip",
+          "checksum": "sha256:28eb509a23f453ebcf37a06a04f5e25cc7c6355aee286527b9c52d819a002454"
         }
       }
     },
